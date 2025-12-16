@@ -83,6 +83,7 @@ export const metahubTags = [
   "Subcategories",
   "Storage","SliderPublic",
   "Pages" ,"Page",
+  "Properties"
 
 ] as const;
 

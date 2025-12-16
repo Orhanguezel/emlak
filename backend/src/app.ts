@@ -30,6 +30,7 @@ import { registerContacts } from "@/modules/contact/router";
 import { registerSlider } from "@/modules/slider/router";
 import { registerMail } from "@/modules/mail/router";
 import { registerNotifications } from "@/modules/notifications/router";
+import { registerFaqs } from '@/modules/faqs/router';
 
 // Admin modüller
 import { registerCustomPagesAdmin } from "@/modules/customPages/admin.routes";
@@ -43,6 +44,7 @@ import { registerStorageAdmin } from '@/modules/storage/admin.routes';
 import { registerCategoriesAdmin } from '@/modules/categories/admin.routes';
 import { registerSubCategoriesAdmin } from '@/modules/subcategories/admin.routes';
 import { registerDbAdmin } from "@/modules/db_admin/admin.routes";
+import { registerFaqsAdmin } from '@/modules/faqs/admin.routes';
 
 // Storage config (site_settings + env) — localBaseUrl için kullanacağız
 import { getStorageSettings } from "@/modules/siteSettings/service";
@@ -184,6 +186,7 @@ export async function createApp() {
     await api.register(registerCategoriesAdmin, { prefix: "/admin" });
     await api.register(registerSubCategoriesAdmin, { prefix: "/admin" });
     await api.register(registerDbAdmin, { prefix: "/admin" });
+    await api.register(registerFaqsAdmin, { prefix: "/admin" });
 
     // --- Public modüller → /api/...
     await registerAuth(api);
@@ -200,6 +203,7 @@ export async function createApp() {
     await registerMail(api);
     await registerNotifications(api);
     await registerProperties(api);
+    await registerFaqs(api);
 
 
   }, { prefix: "/api" });

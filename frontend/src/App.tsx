@@ -13,7 +13,7 @@ import {
 
 import { Header } from "./components/layout/Header";
 import { HeroSection } from "./components/home/HeroSection";
-import { ProductGallery } from "./components/public/ProductGallery";
+import { PropertiesGallery } from "./components/public/PropertiesGallery";
 import { HomePage } from "./components/public/homepage/HomePage";
 import { Footer } from "./components/layout/Footer";
 import { FloatingCallButton } from "./components/public/FloatingCallButton";
@@ -24,7 +24,7 @@ import { AboutPage } from "./components/public/AboutPage";
 import { MissionVisionPage } from "./components/public/MissionVisionPage";
 import { QualityPolicyPage } from "./components/public/QualityPolicyPage";
 import { FAQPage } from "./components/public/FAQPage";
-import { ProductDetailPage } from "./components/public/ProductDetailPage";
+import { PropertyDetailPage } from "./components/public/PropertyDetailPage";
 import { CemeteriesPage } from "./components/public/CemeteriesPage";
 
 import CampaignAnnouncementsPage from "./components/public/CampaignAnnouncementsPage";
@@ -54,7 +54,7 @@ type PageKey =
   | "quality"
   | "faq"
   | "properties"
-  | "productDetail"
+  | "propertyDetail"
   | "cemetery"
   | "campaigns";
 
@@ -77,7 +77,7 @@ const routeMap: Record<PageKey, string> = {
   admin: "/admin",
 
   // detail routes
-  productDetail: "/emlak/:slug",
+  propertyDetail: "/emlak/:slug",
   cemetery: "/cemetery",
 };
 
@@ -96,7 +96,7 @@ function useCurrentPageKey(): PageKey {
   if (pathname.startsWith("/sss")) return "faq";
   if (pathname.startsWith("/emlaklar")) return "properties";
   if (pathname.startsWith("/iletisim")) return "contact";
-  if (pathname.startsWith("/emlak/")) return "productDetail";
+  if (pathname.startsWith("/emlak/")) return "propertyDetail";
   if (pathname.startsWith("/kampanyalar")) return "campaigns";
   if (pathname.startsWith("/cemetery")) return "cemetery";
 
@@ -140,7 +140,10 @@ function HomeComposition(props: {
   searchTerm: string;
   showSearchResults: boolean;
   onClearSearch: () => void;
-  onProductDetail: (slug: string) => void;
+
+  /** ✅ emlak kartından detaya gidiş */
+  onPropertyDetail: (slug: string) => void;
+
   refreshKey: number;
   openRecentWork: (payload: { id: string; slug?: string }) => void;
   openCampaigns: (c?: any) => void;
@@ -151,16 +154,16 @@ function HomeComposition(props: {
     <>
       <HeroSection onNavigate={props.onNavigate} />
 
-      <ProductGallery
+      <PropertiesGallery
         searchTerm={props.searchTerm}
         showSearchResults={props.showSearchResults}
         onClearSearch={props.onClearSearch}
-        onProductDetail={props.onProductDetail}
+        onPropertyDetail={props.onPropertyDetail}
         refreshKey={props.refreshKey}
       />
 
       <HomePage
-        onNavigate={() => { }}
+        onNavigate={() => {}}
         onOpenRecentWorkModal={(w) => props.openRecentWork(w)}
         onOpenCampaignsModal={(c) => props.openCampaigns(c)}
         onOpenAnnouncementModal={(a) => props.openAnnouncement(a)}
@@ -169,18 +172,18 @@ function HomeComposition(props: {
   );
 }
 
-function ProductDetailWrapper(props: { onProductDetail: (slug: string) => void }) {
+function PropertyDetailWrapper(props: { onPropertyDetail: (slug: string) => void }) {
   const params = useParams();
   const slug = params.slug;
 
   if (!slug) return <Navigate to={routeMap.home} replace />;
 
   return (
-    <ProductDetailPage
+    <PropertyDetailPage
       key={`property-${slug}`}
-      productId={slug as string}
-      onNavigate={() => { }}
-      onProductDetail={props.onProductDetail}
+      slug={slug}
+      onNavigate={() => {}}
+      onPropertyDetail={props.onPropertyDetail}
     />
   );
 }
@@ -206,7 +209,9 @@ export default function App() {
   const [selectedAnnouncementId, setSelectedAnnouncementId] = useState<string | null>(null);
 
   const hidePublicChrome = useMemo(
-    () => location.pathname.startsWith("/admin") || location.pathname.startsWith("/adminkontrol"),
+    () =>
+      location.pathname.startsWith("/admin") ||
+      location.pathname.startsWith("/adminkontrol"),
     [location.pathname],
   );
 
@@ -217,7 +222,6 @@ export default function App() {
 
   /**
    * X Emlak event isimleri
-   * (eski mezarisim-* yerine)
    */
   useEffect(() => {
     const refresh = () => setRefreshKey((k) => k + 1);
@@ -237,9 +241,6 @@ export default function App() {
     setSearchTerm(term);
     const has = term.trim().length > 0;
     setShowSearchResults(has);
-
-    // arama yapınca home yerine emlaklar’a da atabiliriz,
-    // ama mevcut akışı bozmayalım: ana sayfada galeri varsa home’a dönsün.
     if (has) navigate(routeMap.home);
   };
 
@@ -248,27 +249,21 @@ export default function App() {
     setShowSearchResults(false);
   };
 
-  /**
-   * Header/Footer artık site_settings'ten path döndürebilir.
-   * Bu yüzden hem PageKey, hem de "/iletisim" gibi path kabul ediyoruz.
-   */
   const onNavigateString = (pageOrPath: string) => {
     const s = String(pageOrPath || "").trim();
     if (!s) return;
 
-    // Path geldiyse direkt navigate
     if (s.startsWith("/")) {
       navigate(s);
       return;
     }
 
-    // PageKey geldiyse map'ten çöz
     const key = s as PageKey;
-    if (key === "productDetail") return; // detail route param ister
+    if (key === "propertyDetail") return; // param ister
     navigate(routeMap[key] ?? routeMap.home);
   };
 
-  const onProductDetail = (slug: string) => {
+  const onPropertyDetail = (slug: string) => {
     navigate(`/emlak/${slug}`);
   };
 
@@ -314,7 +309,7 @@ export default function App() {
                   searchTerm={searchTerm}
                   showSearchResults={showSearchResults}
                   onClearSearch={handleClearSearch}
-                  onProductDetail={onProductDetail}
+                  onPropertyDetail={onPropertyDetail}
                   refreshKey={refreshKey}
                   openRecentWork={openRecentWork}
                   openCampaigns={openCampaigns}
@@ -331,79 +326,30 @@ export default function App() {
             <Route path="/sss" element={<FAQPage onNavigate={onNavigateString} />} />
             <Route path="/iletisim" element={<ContactPage onNavigate={onNavigateString} />} />
 
-            {/* Portföy listesi (şimdilik PricingPage yerine mevcut ProductGallery zaten home’da) */}
-            {/* Eğer ayrı sayfa istersen burada PropertiesPage gibi ayrı component bağlarız: */}
             <Route
               path="/emlaklar"
               element={
-                <ProductGallery
+                <PropertiesGallery
                   searchTerm={searchTerm}
                   showSearchResults={showSearchResults}
                   onClearSearch={handleClearSearch}
-                  onProductDetail={onProductDetail}
+                  onPropertyDetail={onPropertyDetail}
                   refreshKey={refreshKey}
                 />
               }
             />
 
-            {/* Emlak detay */}
-            <Route path="/emlak/:slug" element={<ProductDetailWrapper onProductDetail={onProductDetail} />} />
+            {/* ✅ Emlak detay */}
+            <Route
+              path="/emlak/:slug"
+              element={<PropertyDetailWrapper onPropertyDetail={onPropertyDetail} />}
+            />
 
-            {/* Kampanyalar route'u (modal harici ayrı sayfa istersen) */}
             <Route path="/kampanyalar" element={<CampaignAnnouncementsPage onNavigate={onNavigateString} />} />
 
             {/* Admin akışı — dokunulmadı */}
             <Route path="/adminkontrol" element={<AdminSecretAccess onNavigate={onNavigateString} />} />
             <Route path="/admin" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/products" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/products/new" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/products/:id" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/headstones" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/headstones/new" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/headstones/:id" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/categories" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/categories/new" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/categories/:id" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/subcategories" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/subcategories/new" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/subcategories/:id" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/pages" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/pages/new" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/pages/:id" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/faqs" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/faqs/new" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/faqs/:id" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/recent_works" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/recent_works/new" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/recent_works/:id" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/settings" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/settings/:id" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/settings/new" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/sitesettings" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/announcements" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/announcements/new" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/announcements/:id" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/users" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/users/new" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/users/:id" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/campaigns" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/campaigns/new" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/campaigns/:id" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/contacts" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/contacts/new" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/contacts/:id" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/services" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/services/new" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/services/:id" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/accessories" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/accessories/new" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/accessories/:id" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/sliders" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/sliders/new" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/sliders/:id" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/reviews" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/reviews/new" element={<AdminPanel onNavigate={onNavigateString} />} />
-            <Route path="/admin/reviews/:id" element={<AdminPanel onNavigate={onNavigateString} />} />
 
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/" replace />} />
@@ -425,8 +371,8 @@ export default function App() {
             selectedCampaignId
               ? "Kampanya Detayı"
               : selectedAnnouncementId
-                ? "Duyuru Detayı"
-                : "Duyuru / Kampanyalar"
+              ? "Duyuru Detayı"
+              : "Duyuru / Kampanyalar"
           }
           maxWidth="max-w-3xl"
         >

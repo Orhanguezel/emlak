@@ -1,3 +1,5 @@
+// src/components/public/FAQPage.tsx
+
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../ui/accordion";
 import backgroundImage from "figma:asset/0a9012ca17bfb48233c0877277b7fb8427a12d4c.png";
 import { useListFaqsQuery } from "@/integrations/rtk/endpoints/faqs.endpoints";
