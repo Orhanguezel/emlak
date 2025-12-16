@@ -1,0 +1,33 @@
+
+{
+  "mezar-modelleri": [
+    { "value": "tek-kisilik-mermer-mezar", "label": "Tek Kişilik Mermer Mezar" },
+    { "value": "tek-kisilik-granit-mezar", "label": "Tek Kişilik Granit Mezar" },
+    { "value": "iki-kisilik-mermer-mezar", "label": "İki Kişilik Mermer Mezar" },
+    { "value": "iki-kisilik-granit-mezar", "label": "İki Kişilik Granit Mezar" },
+    { "value": "katli-lahit-mezar", "label": "Katlı Lahit Mezar" },
+    { "value": "ozel-yapim-mezar", "label": "Özel Yapım Mezar" },
+    { "value": "sutunlu-mezar", "label": "Sütunlu Mezar" }
+  ],
+  "mezar-bas-tasi-modelleri": [
+    { "value": "mermer-bas-tasi", "label": "Mermer Baş Taşı" },
+    { "value": "granit-bas-tasi", "label": "Granit Baş Taşı" },
+    { "value": "sutunlu-bas-tasi", "label": "Sütunlu Baş Taşı" }
+  ],
+  "mezar-aksesuarlari": [
+    { "value": "mezar-susleri", "label": "Mezar Süsleri" },
+    { "value": "sutun-modelleri", "label": "Sütun Modelleri" },
+    { "value": "vazo-modelleri", "label": "Vazo Modelleri" },
+    { "value": "diger-modeller", "label": "Diğer Modeller" }
+  ],
+  "mezar-ciceklendirme": [
+    { "value": "mevsimlik-bitki", "label": "Mevsimlik Bitki" },
+    { "value": "surekli-bitki", "label": "Sürekli Bitki" },
+    { "value": "topik-peyzaj", "label": "Topik Peyzaj" }
+  ],
+  "mezar-toprak-dolumu": [
+    { "value": "toprak-dolumu", "label": "Toprak Dolumu" },
+    { "value": "ozel-toprak-karisimi", "label": "Özel Toprak Karışımı" },
+    { "value": "restorasyon", "label": "Restorasyon" }
+  ]
+}

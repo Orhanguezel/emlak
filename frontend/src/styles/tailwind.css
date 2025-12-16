@@ -1,0 +1,111 @@
+/* Tailwind v4 çekirdeği */
+@import "tailwindcss";
+
+/* ---- Tema / Tokenlar ---- */
+@theme {
+  --font-sans: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+  /* radius ve tipografi örnekleri */
+  --radius: 0.625rem; /* 10px */
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+}
+
+/* Shadcn/UI ve admin teması için CSS değişkenleri */
+:root {
+  --font-size: 14px;
+
+  --background: #fff;
+  --foreground: oklch(.145 0 0);
+
+  --card: #fff;
+  --card-foreground: oklch(.145 0 0);
+
+  --popover: #fff;
+  --popover-foreground: oklch(.145 0 0);
+
+  --primary: #030213;
+  --primary-foreground: #ffffff;
+
+  --secondary: oklch(.95 .0058 264.53);
+  --secondary-foreground: #030213;
+
+  --muted: #ececf0;
+  --muted-foreground: #717182;
+
+  --accent: #e9ebef;
+  --accent-foreground: #030213;
+
+  --destructive: #d4183d;
+  --destructive-foreground: #ffffff;
+
+  --border: #0000001a;
+  --input: transparent;
+  --input-background: #f3f3f5;
+
+  --ring: oklch(.708 0 0);
+
+  /* Admin yan menü vs. */
+  --sidebar: oklch(.985 0 0);
+  --sidebar-foreground: oklch(.145 0 0);
+  --sidebar-primary: #030213;
+  --sidebar-primary-foreground: oklch(.985 0 0);
+  --sidebar-accent: oklch(.97 0 0);
+  --sidebar-accent-foreground: oklch(.145 0 0);
+
+  /* Grafik renkleri örnek */
+  --chart-1: oklch(.646 .222 41.116);
+  --chart-2: oklch(.6 .118 184.704);
+  --chart-3: oklch(.398 .07 227.392);
+  --chart-4: oklch(.828 .189 84.429);
+  --chart-5: oklch(.769 .188 70.08);
+}
+
+/* Dark tema (gerekirse) */
+.dark {
+  --background: oklch(.145 0 0);
+  --foreground: #ffffff;
+
+  --card: oklch(.2 0 0);
+  --card-foreground: #ffffff;
+
+  --popover: oklch(.18 0 0);
+  --popover-foreground: #ffffff;
+
+  --primary: #ffffff;
+  --primary-foreground: #030213;
+
+  --secondary: oklch(.26 0 0);
+  --secondary-foreground: #ffffff;
+
+  --muted: oklch(.25 0 0);
+  --muted-foreground: oklch(.78 0 0);
+
+  --accent: oklch(.25 0 0);
+  --accent-foreground: #ffffff;
+
+  --destructive: #ff3b6b;
+  --destructive-foreground: #ffffff;
+
+  --border: oklch(.28 0 0);
+  --input: oklch(.22 0 0);
+  --input-background: oklch(.21 0 0);
+
+  --ring: oklch(.75 0 0);
+
+  --sidebar: oklch(.2 0 0);
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #ffffff;
+  --sidebar-primary-foreground: #030213;
+  --sidebar-accent: oklch(.24 0 0);
+  --sidebar-accent-foreground: #ffffff;
+}
+
+/* İsteğe bağlı ufak base ayarı */
+@layer base {
+  :root { font-size: var(--font-size); }
+}

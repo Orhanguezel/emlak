@@ -1,0 +1,70 @@
+/* ----- SADE GLOBAL STİLLER (Tailwind util değil) ----- */
+
+@import "@/styles/sidebar.css";
+
+
+
+
+/* Dropdown (admin) */
+.admin-dropdown-content {
+  z-index: 9999;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  min-width: 120px;
+  position: fixed;
+  box-shadow: 0 10px 15px -3px #0000001a, 0 4px 6px -2px #0000000d;
+}
+.admin-dropdown-item {
+  cursor: pointer;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 14px;
+  display: flex;
+}
+.admin-dropdown-item:hover { background-color: #f9fafb; }
+.admin-dropdown-item.destructive:hover { background-color: #fef2f2; }
+
+/* Floating call button */
+.floating-call-button {
+  z-index: 2147483647;
+  isolation: isolate;
+  pointer-events: auto;
+  border: none;
+  border-radius: 50%;
+  width: 64px;
+  height: 64px;
+  margin: 0;
+  padding: 16px;
+  font-size: 0;
+  display: block;
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  transform: translateZ(0);
+  box-shadow: 0 4px 12px #00000026, 0 2px 4px #0000001a;
+}
+.floating-call-button:hover {
+  transform: translateZ(0) scale(1.05);
+  box-shadow: 0 6px 16px #0003, 0 3px 6px #00000026;
+}
+.floating-call-button:active { transform: translateZ(0) scale(.95); }
+.floating-call-button svg { color: #fff; width: 24px; height: 24px; display: block; }
+
+/* Hero slider iskeleti */
+.hero-slider-container { isolation: isolate; position: relative; overflow: hidden; }
+.hero-slide { opacity: 0; transition: opacity .6s cubic-bezier(.4,0,.2,1); position: absolute; inset: 0; }
+.hero-slide.active { opacity: 1; z-index: 1; }
+.hero-slide img { object-fit: cover; width: 100%; height: 100%; image-rendering: optimizequality; }
+.hero-content { z-index: 10; display: flex; align-items: center; justify-content: center; position: absolute; inset: 0; }
+.hero-overlay { background: linear-gradient(135deg, #000000b3 0%, #00000080 50%, #0000004d 100%); position: absolute; inset: 0; }
+.hero-indicators { z-index: 20; gap: .375rem; display: flex; position: absolute; bottom: 2rem; left: 50%; transform: translateX(-50%); }
+
+/* (Eski index.css içindeki diğer ÖZEL sınıfların hepsini buranın altına taşı) */
+/* ---------------------------------------------------- */
+
+body {
+  position: relative;
+  left: 0;
+}

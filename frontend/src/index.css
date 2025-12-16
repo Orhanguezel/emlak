@@ -1,0 +1,51 @@
+/* src/index.css */
+@import "@/styles/sidebar.css";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------------------------------------------------- */
+/* GENEL TAŞMA KİLİDİ – yatay scroll'u kapat            */
+/* ---------------------------------------------------- */
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;    /* 🔒 YATAY TAŞMA YOK */
+}
+
+/* React root / Next root hangisini kullanıyorsan */
+#root,
+#__next {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Güvenlik için – tüm elemanlar box-sizing: border-box olsun */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* ---- Sidebar tokenları ve yardımcı sınıflar ---- */
+@layer base {
+  :root {
+    /* HSL tokenlar – istersen değerleri değiştir */
+    --sidebar-background: 222.2 47.4% 11.2%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 172 66% 50%;
+    --sidebar-accent: 199 89% 48%;
+    --sidebar-border: 0 0% 100%/0.10;
+  }
+}
+
+@layer utilities {
+  .bg-sidebar { background-color: hsl(var(--sidebar-background)); }
+  .text-sidebar-foreground { color: hsl(var(--sidebar-foreground)); }
+  .border-sidebar-border { border-color: hsl(var(--sidebar-border)); }
+}
