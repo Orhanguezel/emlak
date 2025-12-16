@@ -166,3 +166,42 @@ INSERT INTO `site_settings` (`id`,`key`,`value`,`created_at`,`updated_at`) VALUE
 -- =============================================================
 INSERT INTO `site_settings` (`id`,`key`,`value`,`created_at`,`updated_at`) VALUES
 (UUID(), 'seo_contact_title',      '"İletişim - X Emlak"', NOW(3), NOW(3));
+
+-- =============================================================
+-- SEO SAYFA BAZLI (X Emlak) - EKLER
+-- =============================================================
+INSERT INTO `site_settings` (`id`,`key`,`value`,`created_at`,`updated_at`) VALUES
+(
+  UUID(),
+  'seo_pages_property_detail',
+  '{
+    "titleTemplate":"{{title}} | X Emlak",
+    "descriptionTemplate":"{{title}} ilan detayı. X Emlak portföyünde satılık/kiralık gayrimenkulleri inceleyin.",
+    "keywordsTemplate":"x emlak, ilan detayı, {{title}}, satılık, kiralık, gayrimenkul",
+    "ogImage":"/og/property.jpg"
+  }',
+  NOW(3),
+  NOW(3)
+)
+ON DUPLICATE KEY UPDATE
+  `value` = VALUES(`value`),
+  `updated_at` = CURRENT_TIMESTAMP(3);
+
+-- (Opsiyonel) Kampanyalar / Duyurular
+INSERT INTO `site_settings` (`id`,`key`,`value`,`created_at`,`updated_at`) VALUES
+(
+  UUID(),
+  'seo_pages_campaigns',
+  '{
+    "title":"Kampanyalar | X Emlak",
+    "description":"Güncel kampanya ve duyurular. X Emlak ile fırsatları takip edin.",
+    "keywords":"x emlak kampanyalar, emlak fırsatları, duyurular",
+    "ogImage":"/og/campaigns.jpg"
+  }',
+  NOW(3),
+  NOW(3)
+)
+ON DUPLICATE KEY UPDATE
+  `value` = VALUES(`value`),
+  `updated_at` = CURRENT_TIMESTAMP(3);
+

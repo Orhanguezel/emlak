@@ -1,19 +1,110 @@
-// FILE: src/components/seo/MobileSEOOptimizer.tsx
+// =============================================================
+// FILE: src/components/seo/MobileSEOOptimizer.tsx   (X Emlak)
+// =============================================================
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useListSiteSettingsQuery } from "@/integrations/rtk/endpoints/site_settings.endpoints";
 
+type Json = any;
+
 interface MobileSEOOptimizerProps {
+  /**
+   * App.tsx -> currentPage: "home" | "properties" | "contact" | "about" | "mission" | ...
+   * Not: property detail gibi sayfalarda "propertyDetail" gelmeli.
+   */
   currentPage: string;
+
+  /**
+   * Opsiyonel override’lar (örn. detail sayfasında ilanın başlığını buradan geçir)
+   */
   title?: string;
   description?: string;
   keywords?: string;
-  canonicalUrl?: string; // override
+
+  /**
+   * Eğer canonical’ı zorlamak istersen (nadiren gerekir)
+   * Örn: bazı sayfalarda querystring temizlemek vb.
+   */
+  canonicalUrl?: string;
+
+  /**
+   * OG görseli override (absolute veya /relative olabilir)
+   */
   ogImage?: string;
 }
 
-type Json = any;
+type SeoDefaults = {
+  canonicalBase: string;
+  siteName: string;
+  ogLocale: string;
+  author: string;
+  themeColor: string;
+  twitterCard: string;
+  robots: string;
+  googlebot: string;
+};
+
+type SeoPage = {
+  title?: string;
+  description?: string;
+  keywords?: string;
+  ogImage?: string;
+
+  /**
+   * Template destekli alanlar (özellikle detail için):
+   * "titleTemplate": "{{title}} | X Emlak"
+   */
+  titleTemplate?: string;
+  descriptionTemplate?: string;
+  keywordsTemplate?: string;
+};
+
+function safeParseJson<T>(raw: unknown, fallback: T): T {
+  if (raw == null) return fallback;
+  if (typeof raw === "object") return raw as T;
+  if (typeof raw !== "string") return fallback;
+
+  const s = raw.trim();
+  if (!s) return fallback;
+
+  try {
+    return JSON.parse(s) as T;
+  } catch {
+    // Bazı projelerde value zaten "..." şeklinde JSON-string olarak saklanıyor olabilir.
+    // Bu durumda tekrar parse etmeyi dene.
+    try {
+      const unquoted = s.startsWith('"') ? JSON.parse(s) : s;
+      if (typeof unquoted === "object") return unquoted as T;
+      if (typeof unquoted === "string") return JSON.parse(unquoted) as T;
+      return fallback;
+    } catch {
+      return fallback;
+    }
+  }
+}
+
+function toAbsUrl(canonicalBase: string, maybeUrl?: string) {
+  if (!maybeUrl) return undefined;
+  const s = String(maybeUrl).trim();
+  if (!s) return undefined;
+  if (s.startsWith("http://") || s.startsWith("https://")) return s;
+  if (s.startsWith("//")) return `https:${s}`;
+  if (s.startsWith("/")) return `${canonicalBase.replace(/\/$/, "")}${s}`;
+  return `${canonicalBase.replace(/\/$/, "")}/${s}`;
+}
+
+function stripHash(u: string) {
+  return u.split("#")[0] || u;
+}
+
+function stripQuery(u: string) {
+  return u.split("?")[0] || u;
+}
+
+function applyTemplate(tpl: string, vars: Record<string, string>) {
+  return tpl.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, k) => vars[k] ?? "");
+}
 
 export function MobileSEOOptimizer({
   currentPage,
@@ -23,8 +114,9 @@ export function MobileSEOOptimizer({
   canonicalUrl,
   ogImage,
 }: MobileSEOOptimizerProps) {
-  // İstenecek key’ler
   const pageKey = currentPage && currentPage !== "home" ? currentPage : "home";
+
+  // İstenecek key’ler (X Emlak)
   const { data: settings } = useListSiteSettingsQuery({
     keys: [
       "seo_defaults",
@@ -37,53 +129,115 @@ export function MobileSEOOptimizer({
       "brand_name",
       "brand_tagline",
       "contact_phone_tel",
+      "contact_phone_display",
+      "contact_address",
+      "contact_email",
     ],
   });
 
-  const getVal = <T = Json,>(k: string, d: T): T =>
-    ((settings?.find((s) => s.key === k)?.value as T) ?? d);
+  const getRaw = (k: string) => settings?.find((s: any) => s.key === k)?.value;
 
-  useEffect(() => {
-    // ======= DEFAULTS =======
-    const defaults = getVal("seo_defaults", {
-      canonicalBase: "https://mezarisim.com",
-      siteName: "Mezarisim.com - Mezar Taşı Uzmanları",
+  const defaults = useMemo<SeoDefaults>(() => {
+    const d = safeParseJson<SeoDefaults>(getRaw("seo_defaults"), {
+      canonicalBase: "https://xemlak.com",
+      siteName: "X Emlak | Gayrimenkul Danışmanlığı",
       ogLocale: "tr_TR",
-      author: "Mezarisim.com - Mezar Taşı Uzmanları",
-      themeColor: "#14b8a6",
+      author: "X Emlak",
+      themeColor: "#1e293b",
       twitterCard: "summary_large_image",
       robots: "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
       googlebot: "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
-    }) as {
-      canonicalBase: string;
-      siteName: string;
-      ogLocale: string;
-      author: string;
-      themeColor: string;
-      twitterCard: string;
-      robots: string;
-      googlebot: string;
+    });
+    // canonicalBase boş gelirse koru
+    return { ...d, canonicalBase: d.canonicalBase || "https://xemlak.com" };
+  }, [settings]);
+
+  const brandName = useMemo(() => {
+    const raw = getRaw("brand_name");
+    const parsed = safeParseJson<string>(raw, "");
+    return parsed || "X Emlak";
+  }, [settings]);
+
+  const brandTagline = useMemo(() => {
+    const raw = getRaw("brand_tagline");
+    return safeParseJson<string>(raw, "") || "";
+  }, [settings]);
+
+  const pageSeo = useMemo<SeoPage>(() => {
+    const p = safeParseJson<SeoPage>(getRaw(`seo_pages_${pageKey}`), {});
+    if (Object.keys(p).length) return p;
+    return safeParseJson<SeoPage>(getRaw("seo_pages_home"), {});
+  }, [settings, pageKey]);
+
+  const sameAs = useMemo<string[]>(() => {
+    return safeParseJson<string[]>(getRaw("seo_social_same_as"), []);
+  }, [settings]);
+
+  const appIcons = useMemo(() => {
+    return safeParseJson<{ appleTouchIcon?: string; favicon32?: string; favicon16?: string }>(
+      getRaw("seo_app_icons"),
+      { appleTouchIcon: "/apple-touch-icon.png" },
+    );
+  }, [settings]);
+
+  const ampClient = useMemo(() => {
+    return safeParseJson<string>(getRaw("seo_amp_google_client_id_api"), "googleanalytics");
+  }, [settings]);
+
+  const telRaw = useMemo(() => {
+    const raw = getRaw("contact_phone_tel");
+    return safeParseJson<string>(raw, "+49000000000") || "+49000000000";
+  }, [settings]);
+
+  useEffect(() => {
+    const canonicalBase = (defaults.canonicalBase || "https://xemlak.com").replace(/\/$/, "");
+
+    // ===== URL (SPA için en doğru canonical/og:url) =====
+    const liveHref =
+      typeof window !== "undefined" && window.location?.href
+        ? window.location.href
+        : `${canonicalBase}/`;
+
+    // canonical override varsa onu kullan; yoksa hash ve query’siz gerçek path’i kullan
+    const computedCanonical = canonicalUrl
+      ? toAbsUrl(canonicalBase, canonicalUrl)!
+      : stripQuery(stripHash(liveHref));
+
+    // OG url de canonical ile aynı olsun
+    const pageUrl = computedCanonical;
+
+    // ===== TEMPLATE vars =====
+    const tplVars: Record<string, string> = {
+      brand_name: brandName,
+      brand_tagline: brandTagline,
+      title: title || "",
+      description: description || "",
+      keywords: keywords || "",
     };
 
-    const pageSEO = getVal(`seo_pages_${pageKey}`, null) || getVal("seo_pages_home", null) || {};
-    const lb = getVal("seo_local_business", null) || null;
-    const sameAs = getVal<string[]>("seo_social_same_as", []);
-    const appIcons = getVal("seo_app_icons", {
-      appleTouchIcon: "/apple-touch-icon.png",
-    }) as { appleTouchIcon?: string };
+    // ===== Sayfa başlık/desc/keywords (öncelik: props override -> template -> page json -> fallback) =====
+    const pageTitle =
+      title ||
+      (pageSeo.titleTemplate ? applyTemplate(pageSeo.titleTemplate, tplVars).trim() : "") ||
+      pageSeo.title ||
+      `${brandName}${brandTagline ? ` | ${brandTagline}` : ""}`;
 
-    const telRaw = String(getVal("contact_phone_tel", "05334838971"));
-    const canonicalBase = canonicalUrl || defaults.canonicalBase;
-
-    const pageTitle = title || "Mezarisim.com";
     const pageDescription =
-      description || "İstanbul’da mezar taşı ve yapım hizmetleri.";
+      description ||
+      (pageSeo.descriptionTemplate ? applyTemplate(pageSeo.descriptionTemplate, tplVars).trim() : "") ||
+      pageSeo.description ||
+      "Satılık/kiralık konut, arsa ve ticari portföy. Şeffaf süreç ve profesyonel danışmanlık.";
+
     const pageKeywords =
       keywords ||
-      "mezar taşı, mezar yapımı, mermer mezar, granit mezar, İstanbul";
-    const pageOgImage = ogImage || undefined;
+      (pageSeo.keywordsTemplate ? applyTemplate(pageSeo.keywordsTemplate, tplVars).trim() : "") ||
+      pageSeo.keywords ||
+      "x emlak, satılık, kiralık, konut, arsa, ticari, gayrimenkul danışmanlığı";
 
-    // ======= DOM HELPERS =======
+    const pageOgImageAbs =
+      toAbsUrl(canonicalBase, ogImage || pageSeo.ogImage || undefined) || undefined;
+
+    // ======= DOM helpers =======
     const updateMeta = (name: string, content: string, isProperty = false) => {
       if (!content) return;
       const selector = isProperty ? `meta[property="${name}"]` : `meta[name="${name}"]`;
@@ -114,14 +268,14 @@ export function MobileSEOOptimizer({
     // ======= BASIC META =======
     updateMeta("description", pageDescription);
     updateMeta("keywords", pageKeywords);
-    updateMeta("author", defaults.author);
+    updateMeta("author", defaults.author || brandName);
     updateMeta("robots", defaults.robots);
     updateMeta("googlebot", defaults.googlebot);
 
     // Mobile / PWA
     updateMeta(
       "viewport",
-      "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+      "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover",
     );
     updateMeta("mobile-web-app-capable", "yes");
     updateMeta("apple-mobile-web-app-capable", "yes");
@@ -129,63 +283,64 @@ export function MobileSEOOptimizer({
     updateMeta("theme-color", defaults.themeColor);
     updateMeta("msapplication-TileColor", defaults.themeColor);
     updateMeta("format-detection", "telephone=yes, address=yes");
-    const ampClient = String(getVal("seo_amp_google_client_id_api", "googleanalytics"));
     updateMeta("amp-google-client-id-api", ampClient);
-    updateMeta("apple-mobile-web-app-title", "Mezarisim");
-    updateMeta("application-name", "Mezarisim");
+    updateMeta("apple-mobile-web-app-title", brandName);
+    updateMeta("application-name", brandName);
 
-    // Icons
+    // Icons (apple touch + favicon örnekleri)
     if (appIcons.appleTouchIcon) {
-      updateLink("apple-touch-icon", appIcons.appleTouchIcon, { sizes: "180x180" });
+      updateLink("apple-touch-icon", toAbsUrl(canonicalBase, appIcons.appleTouchIcon)!, { sizes: "180x180" });
     }
+    if (appIcons.favicon32) updateLink("icon", toAbsUrl(canonicalBase, appIcons.favicon32)!, { sizes: "32x32", type: "image/png" });
+    if (appIcons.favicon16) updateLink("icon", toAbsUrl(canonicalBase, appIcons.favicon16)!, { sizes: "16x16", type: "image/png" });
 
     // ======= OPEN GRAPH =======
-    const pageUrl = `${canonicalBase}${pageKey !== "home" ? `/${pageKey}` : ""}`;
     updateMeta("og:type", "website", true);
     updateMeta("og:title", pageTitle, true);
     updateMeta("og:description", pageDescription, true);
     updateMeta("og:url", pageUrl, true);
-    updateMeta("og:site_name", defaults.siteName, true);
-    updateMeta("og:locale", defaults.ogLocale, true);
-    if (pageOgImage) {
-      updateMeta("og:image", pageOgImage, true);
+    updateMeta("og:site_name", defaults.siteName || brandName, true);
+    updateMeta("og:locale", defaults.ogLocale || "tr_TR", true);
+
+    if (pageOgImageAbs) {
+      updateMeta("og:image", pageOgImageAbs, true);
       updateMeta("og:image:width", "1200", true);
       updateMeta("og:image:height", "630", true);
       updateMeta("og:image:alt", pageTitle, true);
     }
 
     // ======= TWITTER =======
-    updateMeta("twitter:card", defaults.twitterCard);
+    updateMeta("twitter:card", defaults.twitterCard || "summary_large_image");
     updateMeta("twitter:title", pageTitle);
     updateMeta("twitter:description", pageDescription);
-    if (pageOgImage) {
-      updateMeta("twitter:image", pageOgImage);
+    if (pageOgImageAbs) {
+      updateMeta("twitter:image", pageOgImageAbs);
       updateMeta("twitter:image:alt", pageTitle);
     }
 
     // ======= CANONICAL =======
     updateLink("canonical", pageUrl);
 
-    // ======= JSON-LD (LocalBusiness) =======
-    // Önce eski (bizim oluşturduğumuz) script’i temizle
-    document.querySelectorAll('script[type="application/ld+json"][data-seo="localbusiness"]').forEach((n) => n.remove());
-    const ld = lb || {
-      "@context": "https://schema.org",
-      "@type": "LocalBusiness",
-      name: "Mezarisim.com",
-      description: "İstanbul'da kaliteli mezar taşı modelleri ve mezar yapım hizmetleri",
-      url: defaults.canonicalBase,
-      telephone: `+90-${telRaw.replace(/^0/, "").replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3")}`,
-      address: { "@type": "PostalAddress", addressLocality: "İstanbul", addressCountry: "TR" },
-      geo: { "@type": "GeoCoordinates", latitude: 41.0082, longitude: 28.9784 },
-      sameAs,
-      priceRange: "$$",
-      serviceArea: {
-        "@type": "GeoCircle",
-        geoMidpoint: { "@type": "GeoCoordinates", latitude: 41.0082, longitude: 28.9784 },
-        geoRadius: 50000,
-      },
-    };
+    // ======= JSON-LD (RealEstateAgent / LocalBusiness) =======
+    document
+      .querySelectorAll('script[type="application/ld+json"][data-seo="localbusiness"]')
+      .forEach((n) => n.remove());
+
+    const lbRaw = getRaw("seo_local_business");
+    const lb = safeParseJson<any>(lbRaw, null);
+
+    // Eğer DB’de hazır JSON-LD varsa aynen bas; yoksa minimum RealEstateAgent üret
+    const ld =
+      lb ||
+      ({
+        "@context": "https://schema.org",
+        "@type": "RealEstateAgent",
+        name: brandName,
+        url: canonicalBase,
+        telephone: telRaw,
+        sameAs,
+      } as const);
+
     const script = document.createElement("script");
     script.type = "application/ld+json";
     script.setAttribute("data-seo", "localbusiness");
@@ -194,7 +349,23 @@ export function MobileSEOOptimizer({
 
     // ======= HTML LANG =======
     document.documentElement.lang = "tr";
-  }, [settings, currentPage, title, description, keywords, canonicalUrl, ogImage]);
+  }, [
+    settings,
+    defaults,
+    brandName,
+    brandTagline,
+    pageSeo,
+    sameAs,
+    appIcons,
+    ampClient,
+    telRaw,
+    currentPage,
+    title,
+    description,
+    keywords,
+    canonicalUrl,
+    ogImage,
+  ]);
 
   return null;
 }
