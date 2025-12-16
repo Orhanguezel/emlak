@@ -1,0 +1,13 @@
+[
+  { "id": "fe8120b3-919a-49b8-8035-df6fd2a2433f", "title": "Anasayfa",               "url": "/",                       "parentId": null, "order": 0,  "isActive": true, "target": "_self" },
+  { "id": "f2570596-db46-4028-902c-d6fe2c9a8312", "title": "Ürünler",                "url": "/urunler",               "parentId": null, "order": 1,  "isActive": true, "target": "_self" },
+  { "id": "6a4f6b37-ed99-4d98-8c54-d658096aacde", "title": "SSS",                    "url": "/sss",                   "parentId": null, "order": 2,  "isActive": true, "target": "_self" },
+  { "id": "2e32b68d-ae71-4d44-8770-95b8dfb03c36", "title": "Kampanyalar",            "url": "/kampanyalar",           "parentId": null, "order": 3,  "isActive": true, "target": "_self" },
+  { "id": "455c6ddf-658b-4c0f-8a9e-0b104708dd07", "title": "İletişim",               "url": "/iletisim",              "parentId": null, "order": 4,  "isActive": true, "target": "_self" },
+  { "id": "71c28444-7b6e-47ae-92be-f59206a1b820", "title": "Gizlilik Politikası",    "url": "/gizlilik-politikasi",   "parentId": null, "order": 5,  "isActive": true, "target": "_self" },
+  { "id": "3d325c92-d59e-4730-8301-5c9bcff463bc", "title": "KVKK",                   "url": "/kvkk",                  "parentId": null, "order": 6,  "isActive": true, "target": "_self" },
+  { "id": "c47a1c3f-cea1-4780-9381-77336bc8ac59", "title": "Kategoriler",            "url": "/kategoriler",           "parentId": null, "order": 10, "isActive": true, "target": "_self" },
+  { "id": "b1f5e4f3-1e2e-4f4a-8f4a-8f4a8f4a8f4a", "title": "Alt Kategoriler",        "url": "/alt-kategoriler",       "parentId": null, "order": 9,  "isActive": true, "target": "_self" },
+  { "id": "ceed431a-aafb-4aba-bf1f-6217b3960c01", "title": "Blog",                   "url": "/blog",                  "parentId": null, "order": 11, "isActive": true, "target": "_self" },
+  { "id": "25740da6-c0f2-4c1d-b131-998018699bfd", "title": "Hakkımızda",             "url": "/hakkimizda",            "parentId": null, "order": 12, "isActive": true, "target": "_self" }
+]

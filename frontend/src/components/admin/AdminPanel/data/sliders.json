@@ -1,0 +1,13 @@
+[
+  {
+    "id": "1",
+    "title": "Kaliteli Mezar Taşları",
+    "subtitle": "Sevdikleriniz İçin En İyisi",
+    "description": "Yüksek kaliteli mermer ve granit mezar taşları",
+    "image": "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=1200&h=600&fit=crop",
+    "buttonText": "Ürünleri İncele",
+    "buttonLink": "#products",
+    "isActive": true,
+    "order": 1
+  }
+]

@@ -1,0 +1,12 @@
+[
+  {
+    "id": 1,
+    "title": "Kış Kampanyası",
+    "body": "Seçili modellerde %15 indirim!",
+    "image": "",
+    "linkUrl": "/kampanyalar",
+    "isActive": true,
+    "startAt": "2025-11-01T00:00:00.000Z",
+    "endAt": "2026-01-15T23:59:59.000Z"
+  }
+]
