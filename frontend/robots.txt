@@ -1,4 +1,4 @@
-# Mezarisim.com - Robots.txt
+# emlak.com - Robots.txt
 # İstanbul'un En Güvenilir Mezar Taşı Üreticisi
 
 # Allow all major search engines
@@ -11,6 +11,7 @@ Allow: /
 Crawl-delay: 1
 
 User-agent: Bingbot
+
 Allow: /
 Crawl-delay: 1
 
