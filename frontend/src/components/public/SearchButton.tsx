@@ -59,7 +59,7 @@ type Props = {
   hotkey?: string; // default: "k" (Ctrl/⌘+K)
 };
 
-export function FloatingSearchButton({ onSearch, initialTerm = "", hotkey = "k" }: Props) {
+export function SearchButton({ onSearch, initialTerm = "", hotkey = "k" }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [q, setQ] = useState(initialTerm);
   const [mounted, setMounted] = useState(false);

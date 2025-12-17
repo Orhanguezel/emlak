@@ -1,9 +1,9 @@
 {
   "name": "mezarisim",
   "version": "1.0.0",
-  "description": "Mezarisim.com - İstanbul'un En Güvenilir Mezar Taşı Üreticisi",
+  "description": "Xemlak.com - İstanbul'un En Güvenilir Mezar Taşı Üreticisi",
   "type": "module",
-  "homepage": "https://mezarisim.com",
+  "homepage": "https://xemlak.com",
   "keywords": [
     "mezar taşı",
     "mezar modeli",
@@ -99,9 +99,9 @@
     "not ie 11"
   ],
   "author": {
-    "name": "Mezarisim.com",
-    "email": "info@mezarisim.com",
-    "url": "https://mezarisim.com"
+    "name": "Xemlak.com",
+    "email": "info@xemlak.com",
+    "url": "https://xemlak.com"
   },
   "license": "UNLICENSED",
   "private": true

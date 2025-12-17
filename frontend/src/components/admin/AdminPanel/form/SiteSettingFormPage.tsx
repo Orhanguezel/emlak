@@ -312,7 +312,7 @@ export default function SiteSettingFormPage() {
                       SMTP Kullanıcı Adı
                     </label>
                     <Input
-                      placeholder="info@mezarisim.com"
+                      placeholder="info@xemlak.com"
                       value={smtpUsername}
                       onChange={(e) => setSmtpUsername(e.target.value)}
                     />
@@ -344,7 +344,7 @@ export default function SiteSettingFormPage() {
                       Gönderen E-posta (From)
                     </label>
                     <Input
-                      placeholder="info@mezarisim.com"
+                      placeholder="info@xemlak.com"
                       value={smtpFromEmail}
                       onChange={(e) => setSmtpFromEmail(e.target.value)}
                     />
@@ -355,7 +355,7 @@ export default function SiteSettingFormPage() {
                       Gönderen İsim
                     </label>
                     <Input
-                      placeholder="Mezarisim.com"
+                      placeholder="Xemlak.com"
                       value={smtpFromName}
                       onChange={(e) => setSmtpFromName(e.target.value)}
                     />

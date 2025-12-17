@@ -4,35 +4,28 @@ import { useEffect, useState } from "react";
 import { Star } from "lucide-react";
 import { toast } from "sonner";
 
-import { ImageWithFallback } from "../../figma/ImageWithFallback";
 import { Button } from "../../ui/button";
 import { Textarea } from "../../ui/textarea";
 import { Input } from "../../ui/input";
 
+// RTK
 import {
   useListReviewsQuery,
   useCreateReviewMutation,
 } from "@/integrations/rtk/endpoints/reviews.endpoints";
-import { useListRecentWorksQuery } from "@/integrations/rtk/endpoints/recent_works.endpoints";
 
 import type { ReviewCreateInput } from "@/integrations/rtk/types/reviews";
-import type { RecentWorkView } from "@/integrations/rtk/types/recent_works";
-
-import { pickImageUrl, PLACEHOLDER } from "./homepageUtils";
 
 // shadcn carousel
 import { Carousel, CarouselContent, CarouselItem } from "../../ui/carousel";
 
 const COMMENT_IMAGE = "/calluns.avif";
 
-type Props = {
-  onOpenRecentWorkModal?:
-  | ((payload: { id: string; slug?: string }) => void)
-  | undefined;
-};
+// Yedek görsel (src/components/public/Homepage/homepageUtils yok artık)
+const FALLBACK_IMG = "/placeholder.webp";
 
-export function HomeLeftColumn({ onOpenRecentWorkModal }: Props) {
-  /* -------- RTK DATA -------- */
+export function HomeLeftColumn() {
+  /* -------- REVIEWS (RTK) -------- */
   const {
     data: reviews = [],
     isLoading: loadingReviews,
@@ -47,20 +40,9 @@ export function HomeLeftColumn({ onOpenRecentWorkModal }: Props) {
     offset: 0,
   });
 
-  const {
-    data: rwRtk = [],
-    isLoading: loadingRW,
-    isError: errorRW,
-  } = useListRecentWorksQuery({
-    sort: "display_order",
-    orderDir: "asc",
-    limit: 6,
-  });
-
-  const recentWorks = Array.isArray(rwRtk) ? (rwRtk as RecentWorkView[]) : [];
-
   /* -------- FORM STATE -------- */
   const [createReview, { isLoading: sending }] = useCreateReviewMutation();
+
   const [reviewData, setReviewData] = useState<ReviewCreateInput>({
     name: "",
     email: "",
@@ -88,7 +70,11 @@ export function HomeLeftColumn({ onOpenRecentWorkModal }: Props) {
   const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!reviewData.name.trim() || !reviewData.email.trim() || !reviewData.comment.trim()) {
+    if (
+      !reviewData.name.trim() ||
+      !reviewData.email.trim() ||
+      !reviewData.comment.trim()
+    ) {
       toast.error("Lütfen tüm alanları doldurun.");
       return;
     }
@@ -117,70 +103,19 @@ export function HomeLeftColumn({ onOpenRecentWorkModal }: Props) {
 
   return (
     <>
-      {/* Son Çalışmalar */}
-      <div>
-        <h2 className="text-xl md:text-2xl text-center mb-6 md:mb-8 text-slate-900 font-semibold">
-          SON PORTFÖY ÇALIŞMALARIMIZ
-        </h2>
-
-        {loadingRW && <div className="text-center text-sm text-gray-500">Yükleniyor…</div>}
-        {errorRW && <div className="text-center text-sm text-red-600">Çalışmalar yüklenemedi.</div>}
-        {!loadingRW && !errorRW && recentWorks.length === 0 && (
-          <div className="text-center text-sm text-gray-500">Henüz çalışma bulunmuyor.</div>
-        )}
-
-        {!loadingRW && !errorRW && recentWorks.length > 0 && (
-          <div className="grid grid-cols-1 gap-3 md:gap-4">
-            {recentWorks.slice(0, 3).map((w) => {
-              const img = pickImageUrl(w) || PLACEHOLDER;
-
-              return (
-                <div
-                  key={w.id}
-                  className="flex space-x-3 md:space-x-4 p-3 md:p-4 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors"
-                  onClick={() => {
-                    if (!onOpenRecentWorkModal) {
-                      toast.info("Detay modalı bağlanmamış görünüyor.");
-                      return;
-                    }
-                    onOpenRecentWorkModal({ id: String(w.id), slug: w.slug });
-                  }}
-                >
-                  <ImageWithFallback
-                    src={img}
-                    alt={w.alt ?? w.title}
-                    className="w-16 h-12 md:w-20 md:h-16 object-cover rounded flex-shrink-0"
-                  />
-
-                  <div className="flex-1">
-                    <h4 className="text-sm md:text-base mb-1 leading-tight text-slate-900 hover:text-slate-700">
-                      {w.title}
-                    </h4>
-
-                    {w.description && (
-                      <p className="text-xs md:text-sm text-gray-600 leading-relaxed line-clamp-2">
-                        {w.description}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
       {/* Yorum başarı */}
       {reviewSubmitted && (
         <div className="bg-slate-50 p-6 rounded-lg text-center border border-slate-200">
           <div className="text-slate-900 text-4xl mb-3">✓</div>
-          <h3 className="text-lg mb-2 text-slate-900 font-semibold">Teşekkür Ederiz!</h3>
+          <h3 className="text-lg mb-2 text-slate-900 font-semibold">
+            Teşekkür Ederiz!
+          </h3>
           <p className="text-gray-600 text-sm">Görüşünüz başarıyla alındı.</p>
         </div>
       )}
 
       {/* Yorum formu */}
-      {showReviewForm && (
+      {showReviewForm && !reviewSubmitted && (
         <div className="bg-slate-50 p-6 rounded-lg border border-slate-200">
           <h3 className="text-lg mb-4 text-slate-900 text-center font-semibold">
             Yorumunuzu Paylaşın
@@ -190,7 +125,9 @@ export function HomeLeftColumn({ onOpenRecentWorkModal }: Props) {
             <Input
               type="text"
               value={reviewData.name}
-              onChange={(e) => setReviewData((p) => ({ ...p, name: e.target.value }))}
+              onChange={(e) =>
+                setReviewData((p) => ({ ...p, name: e.target.value }))
+              }
               placeholder="Adınız Soyadınız"
               required
             />
@@ -198,7 +135,9 @@ export function HomeLeftColumn({ onOpenRecentWorkModal }: Props) {
             <Input
               type="email"
               value={reviewData.email}
-              onChange={(e) => setReviewData((p) => ({ ...p, email: e.target.value }))}
+              onChange={(e) =>
+                setReviewData((p) => ({ ...p, email: e.target.value }))
+              }
               placeholder="E-posta Adresiniz"
               required
             />
@@ -208,9 +147,14 @@ export function HomeLeftColumn({ onOpenRecentWorkModal }: Props) {
                 <button
                   key={star}
                   type="button"
-                  onClick={() => setReviewData((p) => ({ ...p, rating: star }))}
-                  className={`text-xl transition-colors ${star <= reviewData.rating ? "text-yellow-400" : "text-gray-300"
-                    }`}
+                  onClick={() =>
+                    setReviewData((p) => ({ ...p, rating: star }))
+                  }
+                  className={`text-xl transition-colors ${
+                    star <= reviewData.rating
+                      ? "text-yellow-400"
+                      : "text-gray-300"
+                  }`}
                   aria-label={`${star} yıldız`}
                 >
                   <Star className="w-5 h-5 fill-current" />
@@ -220,7 +164,9 @@ export function HomeLeftColumn({ onOpenRecentWorkModal }: Props) {
 
             <Textarea
               value={reviewData.comment}
-              onChange={(e) => setReviewData((p) => ({ ...p, comment: e.target.value }))}
+              onChange={(e) =>
+                setReviewData((p) => ({ ...p, comment: e.target.value }))
+              }
               placeholder="X Emlak hizmetleri hakkındaki görüşlerinizi paylaşın…"
               rows={3}
               required
@@ -258,7 +204,7 @@ export function HomeLeftColumn({ onOpenRecentWorkModal }: Props) {
               alt="X Emlak hizmetlerini değerlendirmek için yorum gönder"
               className="w-full h-48 md:h-56 object-cover rounded-lg shadow-sm"
               onError={(e) => {
-                (e.currentTarget as HTMLImageElement).src = PLACEHOLDER;
+                (e.currentTarget as HTMLImageElement).src = FALLBACK_IMG;
               }}
               loading="lazy"
               decoding="async"
@@ -270,7 +216,8 @@ export function HomeLeftColumn({ onOpenRecentWorkModal }: Props) {
               GÖRÜŞLERİNİZ BİZİM İÇİN DEĞERLİDİR
             </h3>
             <p className="text-gray-600 text-sm mb-4 text-center">
-              X Emlak ile yaşadığınız deneyimi paylaşın. Yorumunuz, hizmet kalitemizi geliştirmemize yardımcı olur.
+              X Emlak ile yaşadığınız deneyimi paylaşın. Yorumunuz, hizmet
+              kalitemizi geliştirmemize yardımcı olur.
             </p>
 
             <div className="text-center">
@@ -293,7 +240,9 @@ export function HomeLeftColumn({ onOpenRecentWorkModal }: Props) {
           </h2>
         </div>
 
-        {loadingReviews && <div className="text-gray-500 text-sm">Yükleniyor…</div>}
+        {loadingReviews && (
+          <div className="text-gray-500 text-sm">Yükleniyor…</div>
+        )}
 
         {errorReviews && (
           <div className="text-red-600 text-sm">
@@ -322,10 +271,11 @@ export function HomeLeftColumn({ onOpenRecentWorkModal }: Props) {
                       {[1, 2, 3, 4, 5].map((star) => (
                         <Star
                           key={star}
-                          className={`w-5 h-5 ${star <= (r.rating ?? 0)
+                          className={`w-5 h-5 ${
+                            star <= (r.rating ?? 0)
                               ? "text-yellow-400 fill-current"
                               : "text-gray-300"
-                            }`}
+                          }`}
                         />
                       ))}
                     </div>

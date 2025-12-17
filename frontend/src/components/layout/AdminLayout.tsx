@@ -5,27 +5,17 @@ import type { ReactNode } from "react";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import AdminSidebar from "./AdminSidebar";
 
-// ✅ Sekmeler genişletildi
 export type ActiveTab =
-  | "products"
-  | "headstones"
-  | "sliders"
-  | "campaigns"
-  | "recent_works" 
-  | "services"
-  | "accessories" 
-  | "categories"
-  | "subcategories"
-  | "pages"
-  | "sitesettings"
-  | "faqs"
-  | "announcements"
-  | "users"
-  | "contacts"
-  | "reviews"
-  | "settings"
   | "dashboard"
-  ;
+  | "properties"
+  | "sliders"
+  | "pages"
+  | "faqs"
+  | "reviews"
+  | "contacts"
+  | "sitesettings"
+  | "users"
+  | "settings";
 
 type AdminLayoutProps = {
   activeTab: ActiveTab;

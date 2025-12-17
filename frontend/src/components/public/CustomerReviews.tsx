@@ -116,7 +116,7 @@ export function CustomerReviews() {
 
             <div className="bg-teal-600 text-white p-4 rounded-lg mb-6 inline-flex items-center space-x-3">
               <div className="bg-white text-teal-600 px-3 py-1 rounded">
-                <span className="font-semibold">mezarisim.com</span>
+                <span className="font-semibold">xemlak.com</span>
               </div>
               <span>Yaptığımız hizmetleri değerlendirmek için</span>
             </div>

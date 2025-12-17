@@ -1,103 +1,120 @@
+// -------------------------------------------------------------
 // FILE: src/components/public/ContactInfo.tsx
+// -------------------------------------------------------------
+"use client";
+
+import React from "react";
 import { Phone, Mail, MapPin } from "lucide-react";
 import { useListSiteSettingsQuery } from "@/integrations/rtk/endpoints/site_settings.endpoints";
 
+type SiteSettingLike = { key?: string; name?: string; value?: any };
+
+function safeJson<T>(v: any, fallback: T): T {
+  if (v == null) return fallback;
+  if (typeof v === "object") return v as T;
+  if (typeof v !== "string") return fallback;
+  const s = v.trim();
+  if (!s) return fallback;
+
+  try {
+    return JSON.parse(s) as T;
+  } catch {
+    try {
+      const unquoted = JSON.parse(s);
+      if (typeof unquoted === "string") {
+        try {
+          return JSON.parse(unquoted) as T;
+        } catch {
+          return (unquoted as unknown) as T;
+        }
+      }
+      return (unquoted as unknown) as T;
+    } catch {
+      return fallback;
+    }
+  }
+}
+
+function toSettingsMap(data: unknown): Record<string, any> {
+  if (!data) return {};
+  const normalized = (data as any)?.data ?? data;
+
+  if (Array.isArray(normalized)) {
+    const m: Record<string, any> = {};
+    for (const it of normalized as SiteSettingLike[]) {
+      const k = String(it?.key ?? it?.name ?? "").trim();
+      if (!k) continue;
+      m[k] = it?.value;
+    }
+    return m;
+  }
+
+  if (typeof normalized === "object") return normalized as Record<string, any>;
+  return {};
+}
+
+function sanitizePhoneDigits(s: string): string {
+  return (s || "").replace(/[^\d+]/g, "").replace(/\s+/g, "");
+}
+
+function buildTelHref(raw: string): string {
+  const trimmed = (raw || "").trim();
+  if (!trimmed) return "tel:+49000000000";
+  if (trimmed.startsWith("tel:")) return trimmed;
+
+  const cleaned = sanitizePhoneDigits(trimmed);
+  if (!cleaned) return "tel:+49000000000";
+  if (cleaned.startsWith("+")) return `tel:${cleaned}`;
+  return `tel:+${cleaned}`;
+}
+
 export function ContactInfo() {
-  // İhtiyacımız olan key’leri tek istekte çekiyoruz
-  const { data: settings } = useListSiteSettingsQuery({
-    keys: [
-      "contact_phone_display",
-      "contact_phone_tel",
-      "contact_email",
-      "contact_address",
-    ],
-    limit: 50,
+  const { data: settingsRes } = useListSiteSettingsQuery({
+    keys: ["contact_phone_display", "contact_phone_tel", "contact_email", "contact_address"],
   });
 
-  const getSetting = (key: string, fallback: string): string => {
-    const found = settings?.find((s) => s.key === key);
-    const v = found?.value;
-    return typeof v === "string" && v.trim().length > 0 ? v : fallback;
-  };
+  const settings = React.useMemo(() => toSettingsMap(settingsRes), [settingsRes]);
 
-  // Seed’deki default’ları fallback olarak kullan
-  const phoneDisplay = getSetting("contact_phone_display", "0533 483 89 71");
-  const phoneTel = getSetting("contact_phone_tel", "05334838971");
-  const email = getSetting("contact_email", "mezarisim.com@gmail.com");
-  const address = getSetting(
-    "contact_address",
-    "Hekimbaşı Mah. Yıldıztepe Cad. No:41 Ümraniye/İstanbul"
-  );
+  const phoneDisplay = safeJson<string>(settings["contact_phone_display"], "+49 000 000000");
+  const phoneTelRaw = safeJson<string>(settings["contact_phone_tel"], phoneDisplay);
+  const email = safeJson<string>(settings["contact_email"], "info@xemlak.com");
+  const address = safeJson<string>(settings["contact_address"], "Grevenbroich, Deutschland");
 
-  // tel: için boşlukları temizleyelim
-  const phoneHref = `tel:${phoneTel.replace(/\s+/g, "")}`;
-
-  // Adresi iki satıra bölmek istersen basit bir split kullanabiliriz (opsiyonel)
-  // Şu haliyle " / " ile ikiye bölmeyi deneyelim, yoksa tek satır:
-  const [addressLine1, addressLine2] = (() => {
-    // özel bir format yoksa direkt full string’i tek satırda göster
-    if (address.includes("No:41 ")) {
-      // Eski statik haline yakın bir bölme
-      const idx = address.indexOf("No:41 ");
-      const first = address.slice(0, idx + "No:41".length);
-      const second = address.slice(idx + "No:41 ".length);
-      return [first.trim(), second.trim()];
-    }
-    return [address, ""];
-  })();
+  const phoneHref = buildTelHref(phoneTelRaw);
 
   return (
-    <section className="py-6 bg-teal-500">
+    <section className="py-8 bg-slate-950">
       <div className="container mx-auto px-4 max-w-6xl">
-        <div className="grid grid-cols-3 gap-2 md:gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
           {/* TELEFON */}
-          <div className="text-center text-white group">
-            <div className="w-8 h-8 md:w-10 md:h-10 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-2 group-hover:bg-white/30 transition-colors">
-              <Phone className="w-4 h-4 md:w-5 md:h-5" />
+          <div className="text-center text-white border border-white/10 rounded-2xl p-5">
+            <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-3">
+              <Phone className="w-5 h-5" />
             </div>
-            <h3 className="text-xs md:text-sm mb-1 text-white/90">TELEFON</h3>
-            <div className="space-y-0.5">
-              <a
-                href={phoneHref}
-                className="block text-xs md:text-sm text-white hover:text-white/80 transition-colors cursor-pointer"
-              >
-                {phoneDisplay}
-              </a>
-            </div>
+            <div className="text-xs uppercase tracking-wide text-white/70 mb-1">Telefon</div>
+            <a href={phoneHref} className="font-semibold hover:underline">
+              {phoneDisplay}
+            </a>
           </div>
 
           {/* E-POSTA */}
-          <div className="text-center text-white group">
-            <div className="w-8 h-8 md:w-10 md:h-10 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-2 group-hover:bg-white/30 transition-colors">
-              <Mail className="w-4 h-4 md:w-5 md:h-5" />
+          <div className="text-center text-white border border-white/10 rounded-2xl p-5">
+            <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-3">
+              <Mail className="w-5 h-5" />
             </div>
-            <h3 className="text-xs md:text-sm mb-1 text-white/90">E-POSTA</h3>
-            <div className="space-y-0.5">
-              <a
-                href={`mailto:${email}`}
-                className="block text-xs md:text-sm text-white hover:text-white/80 transition-colors cursor-pointer break-all"
-              >
-                {email}
-              </a>
-            </div>
+            <div className="text-xs uppercase tracking-wide text-white/70 mb-1">E-posta</div>
+            <a href={`mailto:${email}`} className="font-semibold hover:underline break-all">
+              {email}
+            </a>
           </div>
 
           {/* ADRES */}
-          <div className="text-center text-white group">
-            <div className="w-8 h-8 md:w-10 md:h-10 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-2 group-hover:bg-white/30 transition-colors">
-              <MapPin className="w-4 h-4 md:w-5 md:h-5" />
+          <div className="text-center text-white border border-white/10 rounded-2xl p-5">
+            <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-3">
+              <MapPin className="w-5 h-5" />
             </div>
-            <h3 className="text-xs md:text-sm mb-1 text-white/90">ADRES</h3>
-            <div className="space-y-0.5">
-              <p className="text-xs md:text-sm text-white/90 leading-tight">
-                {addressLine1}
-              </p>
-              {addressLine2 && (
-                <p className="text-xs md:text-sm text-white/90 leading-tight">
-                  {addressLine2}
-                </p>
-              )}
-            </div>
+            <div className="text-xs uppercase tracking-wide text-white/70 mb-1">Adres</div>
+            <div className="text-white/85 leading-snug">{address}</div>
           </div>
         </div>
       </div>

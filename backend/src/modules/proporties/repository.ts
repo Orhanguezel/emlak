@@ -1,6 +1,16 @@
-// src/modules/proporties/repository.ts
+// =============================================================
+// FILE: src/modules/properties/repository.ts
+// =============================================================
 import { db } from "@/db/client";
-import { properties, type PropertyRow, type NewPropertyRow, rowToView, type PropertyView } from "./schema";
+import {
+  properties,
+  type PropertyRow,
+  type NewPropertyRow,
+  rowToPublicView,
+  rowToAdminView,
+  type PropertyPublicView,
+  type PropertyAdminView,
+} from "./schema";
 import { and, asc, desc, eq, like, or, sql, type SQL } from "drizzle-orm";
 
 /** Sadece güvenilir sıralama kolonları */
@@ -14,10 +24,13 @@ export type ListParams = {
   offset?: number;
 
   is_active?: boolean | 0 | 1 | "0" | "1" | "true" | "false";
+  featured?: boolean | 0 | 1 | "0" | "1" | "true" | "false";
+
   q?: string;
   slug?: string;
   district?: string;
   city?: string;
+  neighborhood?: string;
   type?: string;
   status?: string;
 };
@@ -45,12 +58,14 @@ const parseOrder = (
   return null;
 };
 
-/** list */
-export async function listProperties(params: ListParams) {
+function buildWhere(params: ListParams): SQL | undefined {
   const filters: SQL[] = [];
 
   const act = to01(params.is_active);
   if (act !== undefined) filters.push(eq(properties.is_active, act));
+
+  const feat = to01(params.featured);
+  if (feat !== undefined) filters.push(eq(properties.featured, feat));
 
   if (params.slug && params.slug.trim()) {
     filters.push(eq(properties.slug, params.slug.trim()));
@@ -61,28 +76,53 @@ export async function listProperties(params: ListParams) {
   if (params.city && params.city.trim()) {
     filters.push(eq(properties.city, params.city.trim()));
   }
+  if (params.neighborhood && params.neighborhood.trim()) {
+    filters.push(eq(properties.neighborhood, params.neighborhood.trim()));
+  }
   if (params.type && params.type.trim()) {
     filters.push(eq(properties.type, params.type.trim()));
   }
   if (params.status && params.status.trim()) {
     filters.push(eq(properties.status, params.status.trim()));
   }
+
   if (params.q && params.q.trim()) {
     const s = `%${params.q.trim()}%`;
     const titleLike = like(properties.title, s);
     const addrLike = like(properties.address, s);
     const distLike = like(properties.district, s);
     const cityLike = like(properties.city, s);
+    const nLike = like(properties.neighborhood, s);
     const typeLike = like(properties.type, s);
     const statusLike = like(properties.status, s);
-    filters.push(or(titleLike, addrLike, distLike, cityLike, typeLike, statusLike) as SQL);
+    const listingNoLike = like(properties.listing_no, s);
+
+    filters.push(
+      or(
+        titleLike,
+        addrLike,
+        distLike,
+        cityLike,
+        nLike,
+        typeLike,
+        statusLike,
+        listingNoLike,
+      ) as SQL,
+    );
   }
 
-  const whereExpr: SQL | undefined = filters.length ? (and(...filters) as SQL) : undefined;
+  return filters.length ? (and(...filters) as SQL) : undefined;
+}
+
+/** list (PUBLIC) */
+export async function listPropertiesPublic(params: ListParams) {
+  const whereExpr = buildWhere(params);
 
   const ord = parseOrder(params.orderParam, params.sort, params.order);
   const orderBy = ord
-    ? ord.dir === "asc" ? asc(properties[ord.col]) : desc(properties[ord.col])
+    ? ord.dir === "asc"
+      ? asc(properties[ord.col])
+      : desc(properties[ord.col])
     : asc(properties.display_order);
 
   const take = params.limit && params.limit > 0 ? params.limit : 100;
@@ -93,39 +133,72 @@ export async function listProperties(params: ListParams) {
     db.select({ c: sql<number>`COUNT(1)` }).from(properties).where(whereExpr),
   ]);
 
-  const items: PropertyView[] = (rows as PropertyRow[]).map(rowToView);
+  const items: PropertyPublicView[] = (rows as PropertyRow[]).map(rowToPublicView);
   const total = cnt[0]?.c ?? 0;
   return { items, total };
 }
 
-/** get by id */
-export async function getPropertyById(id: string) {
+/** list (ADMIN) */
+export async function listPropertiesAdmin(params: ListParams) {
+  const whereExpr = buildWhere(params);
+
+  const ord = parseOrder(params.orderParam, params.sort, params.order);
+  const orderBy = ord
+    ? ord.dir === "asc"
+      ? asc(properties[ord.col])
+      : desc(properties[ord.col])
+    : asc(properties.display_order);
+
+  const take = params.limit && params.limit > 0 ? params.limit : 100;
+  const skip = params.offset && params.offset >= 0 ? params.offset : 0;
+
+  const [rows, cnt] = await Promise.all([
+    db.select().from(properties).where(whereExpr).orderBy(orderBy).limit(take).offset(skip),
+    db.select({ c: sql<number>`COUNT(1)` }).from(properties).where(whereExpr),
+  ]);
+
+  const items: PropertyAdminView[] = (rows as PropertyRow[]).map(rowToAdminView);
+  const total = cnt[0]?.c ?? 0;
+  return { items, total };
+}
+
+/** get by id (PUBLIC) */
+export async function getPropertyByIdPublic(id: string) {
   const rows = await db.select().from(properties).where(eq(properties.id, id)).limit(1);
-  return rows[0] ? rowToView(rows[0] as PropertyRow) : null;
+  return rows[0] ? rowToPublicView(rows[0] as PropertyRow) : null;
 }
 
-/** get by slug */
-export async function getPropertyBySlug(slug: string) {
+/** get by id (ADMIN) */
+export async function getPropertyByIdAdmin(id: string) {
+  const rows = await db.select().from(properties).where(eq(properties.id, id)).limit(1);
+  return rows[0] ? rowToAdminView(rows[0] as PropertyRow) : null;
+}
+
+/** get by slug (PUBLIC) */
+export async function getPropertyBySlugPublic(slug: string) {
   const rows = await db.select().from(properties).where(eq(properties.slug, slug)).limit(1);
-  return rows[0] ? rowToView(rows[0] as PropertyRow) : null;
+  return rows[0] ? rowToPublicView(rows[0] as PropertyRow) : null;
 }
 
-/** create */
+/** get by slug (ADMIN) */
+export async function getPropertyBySlugAdmin(slug: string) {
+  const rows = await db.select().from(properties).where(eq(properties.slug, slug)).limit(1);
+  return rows[0] ? rowToAdminView(rows[0] as PropertyRow) : null;
+}
+
+/** create (ADMIN) */
 export async function createProperty(values: NewPropertyRow) {
   await db.insert(properties).values(values);
-  return getPropertyById(values.id);
+  return getPropertyByIdAdmin(values.id);
 }
 
-/** update (partial) */
+/** update (ADMIN, partial) */
 export async function updateProperty(id: string, patch: Partial<NewPropertyRow>) {
-  await db
-    .update(properties)
-    .set({ ...patch, updated_at: new Date() })
-    .where(eq(properties.id, id));
-  return getPropertyById(id);
+  await db.update(properties).set({ ...patch, updated_at: new Date() }).where(eq(properties.id, id));
+  return getPropertyByIdAdmin(id);
 }
 
-/** delete (hard) */
+/** delete (hard, ADMIN) */
 export async function deleteProperty(id: string) {
   const res = await db.delete(properties).where(eq(properties.id, id)).execute();
   const affected =
@@ -153,6 +226,17 @@ export async function listCities(): Promise<string[]> {
     .groupBy(properties.city)
     .orderBy(asc(properties.city));
   return rows.map((r) => r.c);
+}
+
+/** meta: distinct neighborhoods */
+export async function listNeighborhoods(): Promise<string[]> {
+  const rows = await db
+    .select({ n: properties.neighborhood })
+    .from(properties)
+    .where(sql`${properties.neighborhood} IS NOT NULL`)
+    .groupBy(properties.neighborhood)
+    .orderBy(asc(properties.neighborhood));
+  return rows.map((r) => String(r.n));
 }
 
 /** meta: distinct types */

@@ -25,13 +25,6 @@ import { MissionVisionPage } from "./components/public/MissionVisionPage";
 import { QualityPolicyPage } from "./components/public/QualityPolicyPage";
 import { FAQPage } from "./components/public/FAQPage";
 import { PropertyDetailPage } from "./components/public/PropertyDetailPage";
-import { CemeteriesPage } from "./components/public/CemeteriesPage";
-
-import CampaignAnnouncementsPage from "./components/public/CampaignAnnouncementsPage";
-import { DetailPanel } from "./components/public/CampaignAnnouncementDetailPanel";
-import { RecentWorkDetailPage } from "./components/public/RecentWorkDetailPage";
-import { ModalWrapper } from "./components/public/ModalWrapper";
-import { DataProvider } from "./contexts/DataContext";
 
 import { Toaster } from "sonner";
 
@@ -55,8 +48,6 @@ type PageKey =
   | "faq"
   | "properties"
   | "propertyDetail"
-  | "cemetery"
-  | "campaigns";
 
 /**
  * X Emlak PUBLIC route map
@@ -70,7 +61,6 @@ const routeMap: Record<PageKey, string> = {
   faq: "/sss",
   properties: "/emlaklar",
   contact: "/iletisim",
-  campaigns: "/kampanyalar",
 
   // admin
   adminAccess: "/adminkontrol",
@@ -78,7 +68,6 @@ const routeMap: Record<PageKey, string> = {
 
   // detail routes
   propertyDetail: "/emlak/:slug",
-  cemetery: "/cemetery",
 };
 
 function useCurrentPageKey(): PageKey {
@@ -97,8 +86,6 @@ function useCurrentPageKey(): PageKey {
   if (pathname.startsWith("/emlaklar")) return "properties";
   if (pathname.startsWith("/iletisim")) return "contact";
   if (pathname.startsWith("/emlak/")) return "propertyDetail";
-  if (pathname.startsWith("/kampanyalar")) return "campaigns";
-  if (pathname.startsWith("/cemetery")) return "cemetery";
 
   return "home";
 }
@@ -287,7 +274,7 @@ export default function App() {
   };
 
   return (
-    <DataProvider>
+    <div>
       <ScrollToTop />
 
       <div className="min-h-screen bg-white">
@@ -345,11 +332,83 @@ export default function App() {
               element={<PropertyDetailWrapper onPropertyDetail={onPropertyDetail} />}
             />
 
-            <Route path="/kampanyalar" element={<CampaignAnnouncementsPage onNavigate={onNavigateString} />} />
-
             {/* Admin akışı — dokunulmadı */}
             <Route path="/adminkontrol" element={<AdminSecretAccess onNavigate={onNavigateString} />} />
+            {/* ✅ Admin panel VE tüm form rotaları */}
             <Route path="/admin" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/products" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/products/new" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/products/:id" element={<AdminPanel onNavigate={onNavigateString} />} />
+
+            <Route path="/admin/headstones" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/headstones/new" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/headstones/:id" element={<AdminPanel onNavigate={onNavigateString} />} />
+
+            <Route path="/admin/categories" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/categories/new" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/categories/:id" element={<AdminPanel onNavigate={onNavigateString} />} />
+
+            <Route path="/admin/subcategories" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/subcategories/new" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/subcategories/:id" element={<AdminPanel onNavigate={onNavigateString} />} />
+
+            <Route path="/admin/pages" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/pages/new" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/pages/:id" element={<AdminPanel onNavigate={onNavigateString} />} />
+
+            <Route path="/admin/faqs" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/faqs/new" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/faqs/:id" element={<AdminPanel onNavigate={onNavigateString} />} />
+
+            <Route path="/admin/recent_works" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/recent_works/new" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/recent_works/:id" element={<AdminPanel onNavigate={onNavigateString} />} />
+
+            <Route path="/admin/settings" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/settings/:id" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/settings/new" element={<AdminPanel onNavigate={onNavigateString} />} />
+
+            <Route path="/admin/sitesettings" element={<AdminPanel onNavigate={onNavigateString} />} />
+
+            <Route path="/admin/announcements" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/announcements/new" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/announcements/:id" element={<AdminPanel onNavigate={onNavigateString} />} />
+
+            <Route path="/admin/users" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/users/new" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/users/:id" element={<AdminPanel onNavigate={onNavigateString} />} />
+
+            <Route path="/admin/campaigns" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/campaigns/new" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/campaigns/:id" element={<AdminPanel onNavigate={onNavigateString} />} />
+
+            <Route path="/admin/recent_works" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/recent_works/new" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/recent_works/:id" element={<AdminPanel onNavigate={onNavigateString} />} />
+
+            <Route path="/admin/contacts" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/contacts/new" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/contacts/:id" element={<AdminPanel onNavigate={onNavigateString} />} />
+
+            <Route path="/admin/services" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/services/new" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/services/:id" element={<AdminPanel onNavigate={onNavigateString} />} />
+
+            <Route path="/admin/accessories" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/accessories/new" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/accessories/:id" element={<AdminPanel onNavigate={onNavigateString} />} />
+
+            <Route path="/admin/sliders" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/sliders/new" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/sliders/:id" element={<AdminPanel onNavigate={onNavigateString} />} />
+
+            <Route path="/admin/reviews" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/reviews/new" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/reviews/:id" element={<AdminPanel onNavigate={onNavigateString} />} />
+
+            <Route path="/admin/properties" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/properties/new" element={<AdminPanel onNavigate={onNavigateString} />} />
+            <Route path="/admin/properties/:id" element={<AdminPanel onNavigate={onNavigateString} />} />
 
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/" replace />} />
@@ -359,56 +418,8 @@ export default function App() {
         {!hidePublicChrome && <Footer onNavigate={onNavigateString} />}
         {!hidePublicChrome && <FloatingCallButton />}
 
-        {/* Kampanya/Duyuru Modal */}
-        <ModalWrapper
-          isOpen={showCampaignsModal}
-          onClose={() => {
-            setShowCampaignsModal(false);
-            setSelectedCampaignId(null);
-            setSelectedAnnouncementId(null);
-          }}
-          title={
-            selectedCampaignId
-              ? "Kampanya Detayı"
-              : selectedAnnouncementId
-              ? "Duyuru Detayı"
-              : "Duyuru / Kampanyalar"
-          }
-          maxWidth="max-w-3xl"
-        >
-          {selectedCampaignId ? (
-            <DetailPanel kind="campaign" id={selectedCampaignId} />
-          ) : selectedAnnouncementId ? (
-            <DetailPanel kind="announcement" id={selectedAnnouncementId} />
-          ) : (
-            <CampaignAnnouncementsPage onNavigate={onNavigateString} />
-          )}
-        </ModalWrapper>
-
-        {/* Son Çalışmalar Modal */}
-        <ModalWrapper
-          isOpen={showRecentWorkModal}
-          onClose={() => {
-            setShowRecentWorkModal(false);
-            setSelectedRecentWork(null);
-          }}
-          title="Son Portföy Çalışmalarımız"
-          maxWidth="max-w-7xl"
-        >
-          {selectedRecentWork && (
-            <RecentWorkDetailPage
-              id={selectedRecentWork.id}
-              slug={selectedRecentWork.slug}
-              onBack={() => {
-                setShowRecentWorkModal(false);
-                setSelectedRecentWork(null);
-              }}
-            />
-          )}
-        </ModalWrapper>
-
         <Toaster position="top-right" richColors closeButton />
       </div>
-    </DataProvider>
+      </div>
   );
 }

@@ -1,67 +1,220 @@
 // =============================================================
 // FILE: src/components/public/AboutPage.tsx
-// DB-first render; fallback: pageContent (stil aynı kalır)
+// DB-first render (NO fallback)
+// X Emlak style: bg-slate-950 hakim
 // =============================================================
-import { ImageWithFallback } from "../figma/ImageWithFallback";
+"use client";
+
+import * as React from "react";
 import backgroundImage from "figma:asset/49bae4cd4b172781dc5d9ea5d642274ea5ea27b6.png";
 
-// Statik fallback veriler
-import { getAboutPageData } from "../../data/pageContent";
-
-// RTK – custom_pages
 import { useGetCustomPageBySlugQuery } from "@/integrations/rtk/endpoints/custom_pages.endpoints";
+import { useListSiteSettingsQuery } from "@/integrations/rtk/endpoints/site_settings.endpoints";
+
+type SiteSettingLike = { key?: string; name?: string; value?: any };
 
 interface AboutPageProps {
   onNavigate: (page: string) => void;
 }
 
+function safeJson<T>(v: any, fallback: T): T {
+  if (v == null) return fallback;
+  if (typeof v === "object") return v as T;
+  if (typeof v !== "string") return fallback;
+
+  const s = v.trim();
+  if (!s) return fallback;
+
+  try {
+    return JSON.parse(s) as T;
+  } catch {
+    try {
+      const unquoted = JSON.parse(s);
+      if (typeof unquoted === "string") {
+        try {
+          return JSON.parse(unquoted) as T;
+        } catch {
+          return unquoted as unknown as T;
+        }
+      }
+      return unquoted as unknown as T;
+    } catch {
+      return fallback;
+    }
+  }
+}
+
+function toSettingsMap(data: unknown): Record<string, any> {
+  if (!data) return {};
+  const normalized = (data as any)?.data ?? data;
+
+  if (Array.isArray(normalized)) {
+    const m: Record<string, any> = {};
+    for (const it of normalized as SiteSettingLike[]) {
+      const k = String(it?.key ?? it?.name ?? "").trim();
+      if (!k) continue;
+      m[k] = it?.value;
+    }
+    return m;
+  }
+
+  if (typeof normalized === "object") return normalized as Record<string, any>;
+  return {};
+}
+
+function sanitizePhoneDigits(s: string): string {
+  return (s || "").replace(/[^\d+]/g, "").replace(/\s+/g, "");
+}
+
+function buildTelHref(raw: string): string {
+  const trimmed = (raw || "").trim();
+  if (!trimmed) return "tel:+49000000000";
+  if (trimmed.startsWith("tel:")) return trimmed;
+
+  const cleaned = sanitizePhoneDigits(trimmed);
+  if (!cleaned) return "tel:+49000000000";
+  if (cleaned.startsWith("+")) return `tel:${cleaned}`;
+  return `tel:+${cleaned}`;
+}
+
+function buildWhatsappHref(raw: string): string {
+  const cleaned = sanitizePhoneDigits(raw).replace(/^\+/, "");
+  if (!cleaned) return "https://wa.me/49000000000";
+  return `https://wa.me/${cleaned}`;
+}
+
 export function AboutPage({ onNavigate }: AboutPageProps) {
-  const fallback = getAboutPageData();
-  // DB’den sayfa (slug: hakkimizda)
-  const { data: page, isLoading, isError, isFetching } =
-    useGetCustomPageBySlugQuery({ slug: "hakkimizda" });
+  // DB page (slug: hakkimizda)
+  const {
+    data: page,
+    isLoading: pageLoading,
+    isFetching: pageFetching,
+    isError: pageError,
+  } = useGetCustomPageBySlugQuery({ slug: "hakkimizda" });
 
-  const pageTitle = page?.title || fallback.title;
-  const heroTitle = page?.meta_title || fallback.heroTitle;
-  const breadcrumb = fallback.breadcrumb;
+  // Site settings: brand + contact + about hero
+  const { data: settingsRes } = useListSiteSettingsQuery({
+    keys: [
+      "brand_name",
+      "contact_phone_display",
+      "contact_phone_tel",
+      "contact_whatsapp_link",
+      "contact_address",
+      "contact_map_open_url",
 
-  // DB yoksa fallback paragrafları HTML’e çevir
-  const fallbackHtml =
-    `<div class="space-y-4 md:space-y-5">` +
-    fallback.mainContent.paragraphs.map((p) => `<p>${p}</p>`).join("") +
-    `</div>`;
+      // about page meta
+      "about_page_title",
+      "about_page_breadcrumb",
+      "about_page_hero_title",
+      "about_page_lead_body",
+      "about_page_hero_image",
+    ],
+  });
 
-  const htmlContent = (page?.content && String(page.content)) || fallbackHtml;
+  const settings = React.useMemo(() => toSettingsMap(settingsRes), [settingsRes]);
+
+  const brandName = safeJson<string>(settings["brand_name"], "X Emlak");
+
+  // Title / hero / breadcrumb (öncelik: custom_pages -> settings -> default)
+  const pageTitle =
+    (page?.title && String(page.title)) ||
+    safeJson<string>(settings["about_page_title"], "Hakkımızda");
+
+  const heroTitle =
+    (page?.meta_title && String(page.meta_title)) ||
+    safeJson<string>(settings["about_page_hero_title"], pageTitle);
+
+  const breadcrumbText = safeJson<string>(
+    settings["about_page_breadcrumb"],
+    "Kurumsal"
+  );
+
+  const leadBody = safeJson<string>(
+    settings["about_page_lead_body"],
+    ""
+  );
+
+  const heroImage = safeJson<string>(settings["about_page_hero_image"], "") || backgroundImage;
+
+  const htmlContent = page?.content ? String(page.content) : "";
+
+  const contactPhoneDisplay = safeJson<string>(
+    settings["contact_phone_display"],
+    "+49 000 000000"
+  );
+  const contactPhoneRaw = safeJson<string>(
+    settings["contact_phone_tel"],
+    contactPhoneDisplay
+  );
+
+  const telHref = buildTelHref(contactPhoneRaw);
+
+  const waHref =
+    safeJson<string>(settings["contact_whatsapp_link"], "") ||
+    buildWhatsappHref(contactPhoneRaw);
+
+  const contactAddress = safeJson<string>(settings["contact_address"], "");
+  const mapOpenUrl =
+    safeJson<string>(settings["contact_map_open_url"], "") ||
+    (contactAddress
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(contactAddress)}`
+      : "");
+
+  const loading = pageLoading || pageFetching;
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-slate-950">
       {/* Hero */}
       <div
-        className="relative bg-teal-500 py-12 md:py-20 bg-cover bg-center"
-        style={{ backgroundImage: `url(${backgroundImage})` }}
+        className="relative py-14 md:py-20 bg-slate-950 bg-cover bg-center"
+        style={{ backgroundImage: `url(${heroImage})` }}
       >
-        <div className="absolute inset-0 bg-teal-500 bg-opacity-90"></div>
-        <div className="relative container mx-auto px-4">
-          <div className="flex items-center justify-between">
+        <div className="absolute inset-0 bg-slate-950/85" />
+        <div className="relative container mx-auto px-4 max-w-7xl">
+          <div className="flex items-center justify-between gap-6">
             <div className="text-white">
-              <nav className="flex items-center space-x-2 text-sm mb-4">
+              <nav className="flex items-center space-x-2 text-sm mb-4 opacity-90">
                 <button
                   onClick={() => onNavigate("home")}
-                  className="hover:text-teal-200 transition-colors"
+                  className="hover:text-slate-200 transition-colors"
                 >
                   Anasayfa
                 </button>
-                <span>&gt;</span>
-                <span>{pageTitle}</span>
+                <span>/</span>
+                <span className="font-semibold">{pageTitle}</span>
               </nav>
-              <h1 className="text-2xl md:text-4xl mb-2">{heroTitle}</h1>
-              <p className="text-base md:text-lg opacity-90">{breadcrumb}</p>
+
+              <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-2">
+                {heroTitle}
+              </h1>
+
+              <p className="text-base md:text-lg text-white/80">
+                {brandName} • {breadcrumbText}
+              </p>
+
+              {leadBody ? (
+                <p className="mt-3 text-sm md:text-base text-white/70 max-w-2xl">
+                  {leadBody}
+                </p>
+              ) : null}
+
+              {loading && (
+                <div className="mt-6 inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-white text-sm">
+                  Yükleniyor…
+                </div>
+              )}
+
+              {pageError && (
+                <div className="mt-6 inline-flex items-center rounded-md bg-red-500/20 px-3 py-1 text-white text-sm">
+                  İçerik yüklenemedi.
+                </div>
+              )}
             </div>
 
-            {/* 3D kutu */}
+            {/* Sağdaki dekor kutu */}
             <div className="hidden xl:block">
-              <div className="w-40 h-24 md:w-48 md:h-32 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
-                <div className="w-24 h-16 md:w-32 md:h-20 bg-white rounded transform perspective-1000 rotate-y-12 shadow-lg"></div>
+              <div className="w-44 h-28 md:w-56 md:h-36 bg-white/10 rounded-2xl flex items-center justify-center border border-white/10">
+                <div className="w-28 h-18 md:w-36 md:h-24 bg-white/90 rounded-xl shadow-sm" />
               </div>
             </div>
           </div>
@@ -69,49 +222,31 @@ export function AboutPage({ onNavigate }: AboutPageProps) {
       </div>
 
       {/* Content */}
-      <div className="bg-white py-8 md:py-16">
-        <div className="container mx-auto px-4">
+      <div className="bg-white py-10 md:py-16">
+        <div className="container mx-auto px-4 max-w-7xl">
           <div className="max-w-6xl mx-auto">
             <div className="flex flex-col lg:flex-row gap-8 md:gap-12">
               {/* Sol */}
               <div className="lg:w-2/3">
-                <div className="mb-8">
-                  <h2 className="text-xl md:text-2xl text-teal-500 mb-6">
-                    {fallback.mainContent.title}
-                  </h2>
+                <h2 className="text-xl md:text-2xl font-extrabold text-slate-950 mb-6">
+                  {pageTitle}
+                </h2>
 
-                  {/* DB HTML (varsa) ya da fallback paragraflar */}
+                {loading ? (
+                  <div className="space-y-3">
+                    <div className="h-5 bg-slate-100 rounded animate-pulse" />
+                    <div className="h-5 bg-slate-100 rounded animate-pulse" />
+                    <div className="h-5 bg-slate-100 rounded animate-pulse" />
+                    <div className="h-24 bg-slate-100 rounded animate-pulse" />
+                  </div>
+                ) : htmlContent ? (
                   <div
-                    className="prose prose-teal max-w-none text-gray-700 leading-relaxed text-sm md:text-base"
+                    className="prose max-w-none text-slate-700 leading-relaxed text-sm md:text-base"
                     dangerouslySetInnerHTML={{ __html: htmlContent }}
                   />
-
-
-                  {/* Popüler linkler (statik fallback içeriği) */}
-                  <div className="mt-6 md:mt-8 pt-6 border-t border-gray-200">
-                    <h3 className="text-base md:text-lg mb-4 text-gray-800">
-                      {fallback.popularServices.title}
-                    </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-3">
-                      {fallback.popularServices.items.map((item, index) => (
-                        <button
-                          key={index}
-                          onClick={() => onNavigate(item.link)}
-                          className="text-teal-500 hover:text-teal-600 bg-teal-50 hover:bg-teal-100 px-3 py-2 rounded-lg text-xs md:text-sm transition-colors text-left"
-                        >
-                          {item.icon} {item.text}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {(isLoading || isFetching) && (
-                  <div className="text-xs text-gray-500 mt-2">Yükleniyor…</div>
-                )}
-                {isError && (
-                  <div className="text-xs text-red-600 mt-2">
-                    Sayfa içeriği yüklenemedi (fallback gösteriliyor).
+                ) : (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-slate-700">
+                    İçerik hazırlanıyor. Lütfen daha sonra tekrar ziyaret edin.
                   </div>
                 )}
               </div>
@@ -119,65 +254,60 @@ export function AboutPage({ onNavigate }: AboutPageProps) {
               {/* Sağ */}
               <div className="lg:w-1/3">
                 <div className="lg:sticky lg:top-8">
-                  {/* Sağ üstteki boş çerçeve içine logo */}
-                  <div className="w-full h-48 md:h-64 bg-white rounded-lg shadow-lg overflow-hidden flex items-center justify-center">
+                  {/* Marka görseli */}
+                  <div className="w-full h-48 md:h-64 bg-white rounded-2xl shadow-sm overflow-hidden flex items-center justify-center border border-slate-200">
                     <img
-                      src="/mezartasi.png"            // public/mezartasi.png
-                      alt="Mezartaşı – marka görseli"
+                      src="/mezartasi.png"
+                      alt={`${brandName} – marka görseli`}
                       className="max-w-full max-h-full object-contain"
                       loading="lazy"
                     />
                   </div>
 
-
-                  <div className="bg-teal-50 p-4 md:p-6 rounded-lg mt-6">
-                    <h3 className="text-base md:text-lg mb-4 text-teal-700">
-                      {fallback.sidebarServices.title}
+                  {/* İletişim kartı */}
+                  <div className="bg-slate-50 p-5 md:p-6 rounded-2xl mt-6 border border-slate-200">
+                    <h3 className="text-base md:text-lg font-extrabold mb-4 text-slate-950">
+                      İletişim
                     </h3>
-                    <ul className="space-y-2 md:space-y-3 text-xs md:text-sm text-gray-700">
-                      {fallback.sidebarServices.items.map((item, index) => (
-                        <li key={index} className="flex items-center">
-                          <span className="w-2 h-2 bg-teal-500 rounded-full mr-3 flex-shrink-0"></span>
-                          <span>
-                            <strong>{item.title}</strong> - {item.description}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
 
-                    {/* Contact CTA */}
-                    <div className="mt-4 md:mt-6 pt-4 border-t border-teal-200">
-                      <p className="text-xs text-gray-600 mb-3">
-                        <strong>{fallback.contactInfo.message}</strong>
-                      </p>
-                      <div className="flex flex-col gap-2">
-                        <button
-                          onClick={() =>
-                            window.open(
-                              `tel:+90${fallback.contactInfo.phone.replace(/\s/g, "")}`
-                            )
-                          }
-                          className="bg-teal-500 hover:bg-teal-600 text-white px-4 py-2 rounded-lg text-xs md:text-sm transition-colors"
-                        >
-                          📞 {fallback.contactInfo.phone}
-                        </button>
-                        <button
-                          onClick={() => {
-                            window.open(
-                              `https://wa.me/90${fallback.contactInfo.phone.replace(
-                                /\s/g,
-                                ""
-                              )}?text=${encodeURIComponent(
-                                fallback.contactInfo.whatsappMessage
-                              )}`,
-                              "_blank"
-                            );
-                          }}
-                          className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-xs md:text-sm transition-colors"
-                        >
-                          💬 WhatsApp'tan Yazın
-                        </button>
+                    {contactAddress ? (
+                      <div className="text-xs md:text-sm text-slate-700 mb-4">
+                        <div className="font-semibold text-slate-900 mb-1">Adres</div>
+                        <div className="whitespace-pre-wrap">{contactAddress}</div>
                       </div>
+                    ) : null}
+
+                    <div className="flex flex-col gap-2">
+                      <a
+                        href={telHref}
+                        className="bg-slate-950 hover:bg-slate-900 text-white px-4 py-2 rounded-xl text-xs md:text-sm transition-colors text-center font-semibold"
+                      >
+                        📞 {contactPhoneDisplay}
+                      </a>
+
+                      <a
+                        href={waHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-white hover:bg-slate-50 text-slate-950 px-4 py-2 rounded-xl text-xs md:text-sm transition-colors text-center font-semibold border border-slate-300"
+                      >
+                        💬 WhatsApp’tan Yazın
+                      </a>
+
+                      {!!mapOpenUrl && (
+                        <a
+                          href={mapOpenUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-slate-950 hover:underline text-xs md:text-sm text-center font-semibold"
+                        >
+                          📍 Haritada Aç
+                        </a>
+                      )}
+                    </div>
+
+                    <div className="mt-4 pt-4 border-t border-slate-200 text-[11px] text-slate-500">
+                      Not: Bu alanlar site_settings üzerinden yönetilir.
                     </div>
                   </div>
                 </div>
