@@ -24,3 +24,4 @@ export async function registerProperties(app: FastifyInstance) {
   app.get(`${BASE}/_meta/types`, { config: { public: true } }, listTypesPublic);
   app.get(`${BASE}/_meta/statuses`, { config: { public: true } }, listStatusesPublic);
 }
+

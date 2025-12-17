@@ -11,15 +11,12 @@ import { toast } from "sonner";
 import { ImageWithFallback } from "../figma/ImageWithFallback";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
-import { Input } from "../ui/input";
-import { Textarea } from "../ui/textarea";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../ui/accordion";
 
 import { useGetPropertyBySlugQuery, useListPropertiesQuery } from "@/integrations/rtk/endpoints/properties.endpoints";
 import { useListSiteSettingsQuery } from "@/integrations/rtk/endpoints/site_settings.endpoints";
 import { useCreateContactMutation } from "@/integrations/rtk/endpoints/contacts.endpoints";
 import type { ContactCreateInput } from "@/integrations/rtk/types/contacts";
-import type { Properties as PropertyView } from "@/integrations/rtk/types/properties";
+import type { Properties as PropertyView, PropertyAssetPublic } from "@/integrations/rtk/types/properties";
 
 // ----------------------------- helpers: site settings -----------------------------
 
@@ -65,6 +62,8 @@ function normalizeStatusLabel(v: string): string {
   if (s === "sold") return "Satıldı";
   if (s === "new") return "Yeni";
   if (s === "in_progress") return "Süreçte";
+  if (s === "satilik") return "Satılık";
+  if (s === "kiralik") return "Kiralık";
   return v || "Durum";
 }
 
@@ -78,13 +77,20 @@ function safeImage(v: unknown): string {
   return s.length ? s : PLACEHOLDER_IMG;
 }
 
-function safeImages(v: unknown): string[] {
-  if (Array.isArray(v)) {
-    const arr = v.map(safeImage).filter(Boolean);
-    return arr.length ? arr : [PLACEHOLDER_IMG];
-  }
-  const one = safeImage(v);
-  return [one];
+function pickImagesFromAssets(assets: PropertyAssetPublic[] | undefined): string[] {
+  if (!Array.isArray(assets) || !assets.length) return [PLACEHOLDER_IMG];
+
+  const images = assets
+    .filter((a) => (a?.kind || "image") === "image")
+    .sort((a, b) => {
+      // cover first, then display_order
+      if (a.is_cover !== b.is_cover) return a.is_cover ? -1 : 1;
+      return (a.display_order ?? 0) - (b.display_order ?? 0);
+    })
+    .map((a) => safeImage(a?.url))
+    .filter(Boolean);
+
+  return images.length ? images : [PLACEHOLDER_IMG];
 }
 
 type UiProperty = {
@@ -103,13 +109,21 @@ type UiProperty = {
 
   description?: string | null;
 
-  image: string;   // ✅ kesin string
-  images: string[]; // ✅ en az 1 eleman
+  image: string;    // cover
+  images: string[]; // gallery (>=1)
 };
 
 function toUiProperty(p: PropertyView): UiProperty {
-  // Backend ileride images/image_url döndürürse yakala
-  const imgs = safeImages((p as any).images ?? (p as any).image_url ?? (p as any).image ?? PLACEHOLDER_IMG);
+  const assets = Array.isArray((p as any).assets) ? ((p as any).assets as PropertyAssetPublic[]) : undefined;
+
+  const imgs = pickImagesFromAssets(assets);
+
+  const cover = safeImage(
+    (p as any).image_effective_url ??
+      (p as any).image_url ??
+      imgs[0] ??
+      PLACEHOLDER_IMG,
+  );
 
   const lat = Number((p as any)?.coordinates?.lat ?? (p as any)?.lat);
   const lng = Number((p as any)?.coordinates?.lng ?? (p as any)?.lng);
@@ -133,7 +147,7 @@ function toUiProperty(p: PropertyView): UiProperty {
     description: (p as any).description ?? null,
 
     images: imgs,
-    image: imgs[0]!, // ✅ artık garanti var (safeImages en az 1 döndürüyor)
+    image: cover,
   };
 }
 
@@ -149,7 +163,6 @@ interface PropertyDetailPageProps {
 
 export function PropertyDetailPage({ slug, onNavigate, onPropertyDetail }: PropertyDetailPageProps) {
   const routerNavigate = useNavigate();
-
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   const [formData, setFormData] = useState({
@@ -180,6 +193,10 @@ export function PropertyDetailPage({ slug, onNavigate, onPropertyDetail }: Prope
   const property = useMemo(() => (detailData ? toUiProperty(detailData) : null), [detailData]);
 
   useEffect(() => {
+    setCurrentImageIndex(0);
+  }, [slug]);
+
+  useEffect(() => {
     if (property && !formData.subject.trim()) {
       setFormData((p) => ({
         ...p,
@@ -188,7 +205,7 @@ export function PropertyDetailPage({ slug, onNavigate, onPropertyDetail }: Prope
     }
   }, [property]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const { data: otherRes } = useListPropertiesQuery({ active: true, limit: 12, offset: 0 });
+  const { data: otherRes } = useListPropertiesQuery({ active: true, limit: 24, offset: 0 });
 
   const otherProps: UiProperty[] = useMemo(() => {
     const arr = Array.isArray(otherRes) ? (otherRes as PropertyView[]) : [];
@@ -291,6 +308,8 @@ export function PropertyDetailPage({ slug, onNavigate, onPropertyDetail }: Prope
   }
 
   const images = property.images.length ? property.images : [property.image];
+  const safeIndex = Math.min(Math.max(0, currentImageIndex), images.length - 1);
+  const current = images[safeIndex] ?? property.image;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -334,8 +353,8 @@ export function PropertyDetailPage({ slug, onNavigate, onPropertyDetail }: Prope
           <div className="space-y-6">
             <div className="aspect-[4/3] bg-white rounded-xl overflow-hidden shadow-md border border-gray-100">
               <ImageWithFallback
-                src={images[currentImageIndex] ?? property.image}
-                alt={`${property.title} - Görsel ${currentImageIndex + 1}`}
+                src={current}
+                alt={`${property.title} - Görsel ${safeIndex + 1}`}
                 className="w-full h-full object-cover"
               />
             </div>
@@ -347,7 +366,7 @@ export function PropertyDetailPage({ slug, onNavigate, onPropertyDetail }: Prope
                     key={`${property.id}-${idx}`}
                     onClick={() => setCurrentImageIndex(idx)}
                     className={`aspect-square rounded-lg overflow-hidden border-2 transition-all ${
-                      idx === currentImageIndex
+                      idx === safeIndex
                         ? "border-slate-900 ring-2 ring-slate-200"
                         : "border-gray-200 hover:border-gray-300"
                     }`}
@@ -424,11 +443,51 @@ export function PropertyDetailPage({ slug, onNavigate, onPropertyDetail }: Prope
                 </Button>
               </div>
             )}
+
+            {/* Contact quick actions */}
+            <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+              <div className="text-sm text-gray-600 mb-2">Hızlı İletişim</div>
+              <div className="flex flex-wrap gap-2">
+                <a href={telHref}>
+                  <Button variant="outline" className="border-slate-900 text-slate-900 hover:bg-slate-900 hover:text-white">
+                    Ara: {contactPhoneDisplay}
+                  </Button>
+                </a>
+                <a href={waHref} target="_blank" rel="noreferrer">
+                  <Button className="bg-slate-900 hover:bg-slate-800 text-white">
+                    WhatsApp
+                  </Button>
+                </a>
+              </div>
+            </div>
+
+            {/* İstersen burada senin form / accordion blokların devam edebilir */}
           </div>
         </div>
 
-        {/* Accordions + CTA (senin mevcut kodun aynı şekilde devam edebilir) */}
-        {/* ... */}
+        {/* Diğer ilanlar */}
+        {otherProps.length > 0 && (
+          <div className="mt-12">
+            <h3 className="text-2xl font-bold text-slate-900 mb-5">Benzer İlanlar</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {otherProps.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => goDetail(p)}
+                  className="text-left bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition"
+                >
+                  <div className="aspect-[4/3] bg-gray-100 overflow-hidden">
+                    <ImageWithFallback src={p.image} alt={p.title} className="w-full h-full object-cover" />
+                  </div>
+                  <div className="p-3">
+                    <div className="text-sm font-bold text-slate-900 line-clamp-2">{p.title}</div>
+                    <div className="text-xs text-gray-600 mt-1">{p.district}, {p.city}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

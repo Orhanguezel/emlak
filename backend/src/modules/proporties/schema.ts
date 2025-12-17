@@ -16,12 +16,13 @@ import {
 } from "drizzle-orm/mysql-core";
 import { sql } from "drizzle-orm";
 
-/**
- * properties — ilan modülü
- * - image_url (legacy) + image_asset_id (yeni ilişki) + alt
- * - Sahibinden benzeri: fiyat, m2, oda, kat, ısınma, eşya, site içi vb.
- * - ✅ min_price_admin: sadece admin görecek (public mapper’da dönme)
- */
+// =============================================================
+// properties — ilan modülü
+// - legacy cover alanları: image_url + image_asset_id + alt
+// - filtrelenebilir çekirdek alanlar: oda/bina yaşı/kat/kat sayısı/ısınma/kullanım durumu
+// - bool filtreler: asansör/otopark/eşyalı/site içi vb.
+// - ✅ min_price_admin: sadece admin görecek
+// =============================================================
 export const properties = mysqlTable(
   "properties",
   {
@@ -31,15 +32,15 @@ export const properties = mysqlTable(
     title: varchar("title", { length: 255 }).notNull(),
     slug: varchar("slug", { length: 255 }).notNull(),
 
-    // Tip / Durum (senin mevcut alanların)
-    type: varchar("type", { length: 255 }).notNull(), // örn: daire/villa/arsa
-    status: varchar("status", { length: 64 }).notNull(), // örn: satilik/kiralik
+    // Tip / Durum
+    type: varchar("type", { length: 255 }).notNull(), // daire/villa/arsa
+    status: varchar("status", { length: 64 }).notNull(), // satilik/kiralik
 
     // Adres / konum
     address: varchar("address", { length: 500 }).notNull(),
     district: varchar("district", { length: 255 }).notNull(),
     city: varchar("city", { length: 255 }).notNull(),
-    neighborhood: varchar("neighborhood", { length: 255 }), // ops
+    neighborhood: varchar("neighborhood", { length: 255 }),
 
     // Koordinatlar (DECIMAL -> string)
     lat: decimal("lat", { precision: 10, scale: 6 }).$type<string>().notNull(),
@@ -49,52 +50,82 @@ export const properties = mysqlTable(
     description: text("description"),
 
     // =========================================================
-    // ✅ Sahibinden benzeri detaylar
+    // Fiyat
     // =========================================================
-
-    // Fiyat (public)
-    price: decimal("price", { precision: 12, scale: 2 }).$type<string>(), // ops: bazı ilanlarda fiyat gizli olabilir
+    price: decimal("price", { precision: 12, scale: 2 }).$type<string>(),
     currency: varchar("currency", { length: 8 }).notNull().default("TRY"),
-
-    // ✅ Admin-only min fiyat (ör: yönetim için taban maliyet / minimum satış)
     min_price_admin: decimal("min_price_admin", { precision: 12, scale: 2 }).$type<string>(),
 
     // Kart metası
-    listing_no: varchar("listing_no", { length: 32 }), // ilan no (ops)
-    badge_text: varchar("badge_text", { length: 40 }), // "Fırsat" vs
+    listing_no: varchar("listing_no", { length: 32 }),
+    badge_text: varchar("badge_text", { length: 40 }),
     featured: tinyint("featured", { unsigned: true }).notNull().default(0),
 
-    // Emlak detay
+    // =========================================================
+    // m2
+    // =========================================================
     gross_m2: int("gross_m2", { unsigned: true }),
     net_m2: int("net_m2", { unsigned: true }),
+
+    // =========================================================
+    // ✅ Filtrelenecek çekirdek alanlar
+    // =========================================================
+    // Oda sayısı: UI genelde "2+1" gibi ister
     rooms: varchar("rooms", { length: 16 }), // "2+1"
-    building_age: varchar("building_age", { length: 32 }), // "0", "5-10"
-    floor: varchar("floor", { length: 32 }), // "3", "Zemin"
+    // Sayısal filtre kolaylığı için opsiyonel numeric kolon (önerilir)
+    bedrooms: tinyint("bedrooms", { unsigned: true }), // 0..50
+
+    // Bina yaşı: "0", "5-10" gibi (Sahibinden yaklaşımı)
+    building_age: varchar("building_age", { length: 32 }),
+
+    // Bulunduğu kat: UI'da "Zemin", "Bahçe" vs olabilir
+    floor: varchar("floor", { length: 32 }),
+    // Range filtre için numeric floor_no (önerilir)
+    floor_no: int("floor_no"),
+
+    // Kat sayısı
     total_floors: int("total_floors", { unsigned: true }),
 
-    // Isınma / eşya / site vb.
-    heating: varchar("heating", { length: 64 }), // "kombi"
-    furnished: tinyint("furnished", { unsigned: true }).notNull().default(0),
-    in_site: tinyint("in_site", { unsigned: true }).notNull().default(0),
-    has_balcony: tinyint("has_balcony", { unsigned: true }).notNull().default(0),
-    has_parking: tinyint("has_parking", { unsigned: true }).notNull().default(0),
-    has_elevator: tinyint("has_elevator", { unsigned: true }).notNull().default(0),
+    // Isıtma (kombi, merkezi, klima, yerden vb.)
+    heating: varchar("heating", { length: 64 }),
+
+    // Kullanım durumu (Boş / Kiracılı / Ev sahibi)
+    usage_status: varchar("usage_status", { length: 32 }), // bos|kiracili|ev_sahibi|...
 
     // =========================================================
-    // ✅ Görsel (Slider ile aynı pattern)
+    // ✅ Bool filtreler (UI’daki toggle/kriterler)
     // =========================================================
-    image_url: text("image_url"), // legacy public url
-    image_asset_id: char("image_asset_id", { length: 36 }), // storage relation
+    furnished: tinyint("furnished", { unsigned: true }).notNull().default(0), // Eşyalı
+    in_site: tinyint("in_site", { unsigned: true }).notNull().default(0), // Site içerisinde
+
+    has_elevator: tinyint("has_elevator", { unsigned: true }).notNull().default(0), // Asansör
+    has_parking: tinyint("has_parking", { unsigned: true }).notNull().default(0), // Otopark
+    has_balcony: tinyint("has_balcony", { unsigned: true }).notNull().default(0),
+
+    has_garden: tinyint("has_garden", { unsigned: true }).notNull().default(0),
+    has_terrace: tinyint("has_terrace", { unsigned: true }).notNull().default(0),
+
+    credit_eligible: tinyint("credit_eligible", { unsigned: true }).notNull().default(0),
+    swap: tinyint("swap", { unsigned: true }).notNull().default(0),
+
+    has_video: tinyint("has_video", { unsigned: true }).notNull().default(0),
+    has_clip: tinyint("has_clip", { unsigned: true }).notNull().default(0),
+    has_virtual_tour: tinyint("has_virtual_tour", { unsigned: true }).notNull().default(0),
+    has_map: tinyint("has_map", { unsigned: true }).notNull().default(1),
+    accessible: tinyint("accessible", { unsigned: true }).notNull().default(0),
+
+    // =========================================================
+    // Legacy cover (Slider ile aynı pattern)
+    // =========================================================
+    image_url: text("image_url"),
+    image_asset_id: char("image_asset_id", { length: 36 }),
     alt: varchar("alt", { length: 255 }),
 
-    // Yayın / sıralama (senin mevcut)
+    // Yayın / sıralama
     is_active: tinyint("is_active").notNull().default(1),
     display_order: int("display_order").notNull().default(0),
 
-    created_at: datetime("created_at", { fsp: 3 })
-      .notNull()
-      .default(sql`CURRENT_TIMESTAMP(3)`),
-
+    created_at: datetime("created_at", { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
     updated_at: datetime("updated_at", { fsp: 3 })
       .notNull()
       .default(sql`CURRENT_TIMESTAMP(3)`)
@@ -114,21 +145,85 @@ export const properties = mysqlTable(
     index("properties_type_idx").on(t.type),
     index("properties_status_idx").on(t.status),
 
+    // sık kullanılan filtre indexleri
     index("properties_price_idx").on(t.price),
+    index("properties_rooms_idx").on(t.rooms),
+    index("properties_bedrooms_idx").on(t.bedrooms),
+    index("properties_building_age_idx").on(t.building_age),
+
+    index("properties_floor_no_idx").on(t.floor_no),
+    index("properties_total_floors_idx").on(t.total_floors),
+
+    index("properties_heating_idx").on(t.heating),
+    index("properties_usage_status_idx").on(t.usage_status),
+
+    index("properties_furnished_idx").on(t.furnished),
+    index("properties_in_site_idx").on(t.in_site),
+    index("properties_has_elevator_idx").on(t.has_elevator),
+    index("properties_has_parking_idx").on(t.has_parking),
+
+    index("properties_credit_eligible_idx").on(t.credit_eligible),
+    index("properties_swap_idx").on(t.swap),
+
+    index("properties_has_video_idx").on(t.has_video),
+    index("properties_has_virtual_tour_idx").on(t.has_virtual_tour),
+
     index("properties_image_asset_idx").on(t.image_asset_id),
   ],
 );
 
-export type PropertyRow = typeof properties.$inferSelect;      // DECIMAL: string
-export type NewPropertyRow = typeof properties.$inferInsert;   // DECIMAL: string
+// =============================================================
+// property_assets — ilan galerisi (çoklu resim/medya)
+// =============================================================
+export const property_assets = mysqlTable(
+  "property_assets",
+  {
+    id: char("id", { length: 36 }).primaryKey().notNull(),
+    property_id: char("property_id", { length: 36 }).notNull(),
 
+    asset_id: char("asset_id", { length: 36 }), // storage relation
+    url: text("url"), // legacy / external
+    alt: varchar("alt", { length: 255 }),
+
+    kind: varchar("kind", { length: 24 }).notNull().default("image"), // image|video|plan
+    mime: varchar("mime", { length: 100 }),
+
+    is_cover: tinyint("is_cover", { unsigned: true }).notNull().default(0),
+    display_order: int("display_order").notNull().default(0),
+
+    created_at: datetime("created_at", { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+    updated_at: datetime("updated_at", { fsp: 3 })
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP(3)`)
+      .$onUpdateFn(() => new Date()),
+  },
+  (t) => [
+    index("property_assets_property_idx").on(t.property_id),
+    index("property_assets_asset_idx").on(t.asset_id),
+    index("property_assets_cover_idx").on(t.property_id, t.is_cover),
+    index("property_assets_order_idx").on(t.property_id, t.display_order),
+  ],
+);
+
+export type PropertyRow = typeof properties.$inferSelect; // DECIMAL: string
+export type NewPropertyRow = typeof properties.$inferInsert;
+
+export type PropertyAssetRow = typeof property_assets.$inferSelect;
+export type NewPropertyAssetRow = typeof property_assets.$inferInsert;
+
+// =============================================================
+// Helpers
+// =============================================================
 const toNum = (v: unknown): number => {
   const n = typeof v === "string" ? Number(v) : (v as number);
   return Number.isFinite(n) ? n : 0;
 };
 const toBool = (v: unknown): boolean => v === true || v === 1 || v === "1" || v === "true";
 
-/** ✅ Public view: admin-only alan dönmez */
+// =============================================================
+// Public/Admin Views
+// NOTE: assets[] burada yok; repo'da property_assets çekip eklemelisin.
+// =============================================================
 export function rowToPublicView(r: PropertyRow) {
   return {
     id: r.id,
@@ -156,18 +251,38 @@ export function rowToPublicView(r: PropertyRow) {
 
     gross_m2: r.gross_m2 ?? null,
     net_m2: r.net_m2 ?? null,
+
+    // filtrelenen ana alanlar
     rooms: r.rooms ?? null,
+    bedrooms: r.bedrooms ?? null,
     building_age: r.building_age ?? null,
+
     floor: r.floor ?? null,
+    floor_no: r.floor_no ?? null,
     total_floors: r.total_floors ?? null,
 
     heating: r.heating ?? null,
+    usage_status: r.usage_status ?? null,
+
+    // bool filtreler
     furnished: toBool(r.furnished),
     in_site: toBool(r.in_site),
-    has_balcony: toBool(r.has_balcony),
-    has_parking: toBool(r.has_parking),
     has_elevator: toBool(r.has_elevator),
+    has_parking: toBool(r.has_parking),
+    has_balcony: toBool(r.has_balcony),
+    has_garden: toBool(r.has_garden),
+    has_terrace: toBool(r.has_terrace),
 
+    credit_eligible: toBool(r.credit_eligible),
+    swap: toBool(r.swap),
+
+    has_video: toBool(r.has_video),
+    has_clip: toBool(r.has_clip),
+    has_virtual_tour: toBool(r.has_virtual_tour),
+    has_map: toBool(r.has_map),
+    accessible: toBool(r.accessible),
+
+    // legacy cover
     image_url: r.image_url ?? null,
     image_asset_id: r.image_asset_id ?? null,
     alt: r.alt ?? null,
@@ -180,7 +295,6 @@ export function rowToPublicView(r: PropertyRow) {
   };
 }
 
-/** ✅ Admin view: min_price_admin dahil */
 export function rowToAdminView(r: PropertyRow) {
   return {
     ...rowToPublicView(r),

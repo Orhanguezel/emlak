@@ -174,7 +174,10 @@ export const adminCreateAsset: RouteHandler = async (req, reply) => {
     folder,
   };
 
-  req.log.info(fileLog, "storage upload: file received, starting provider upload");
+  req.log.info(
+    fileLog,
+    "storage upload: file received, starting provider upload",
+  );
 
   // 1) Upload (Cloudinary veya local)
   let up: UploadResult;
@@ -290,20 +293,14 @@ export const adminCreateAsset: RouteHandler = async (req, reply) => {
       const existing = await getByBucketPath(bucket, path);
       if (existing) {
         req.log.warn(
-          {
-            ...fileLog,
-            rec_id: existing.id,
-          },
+          { ...fileLog, rec_id: existing.id },
           "storage upload: duplicate key, returning existing row",
         );
         return reply.code(200).send({
           ...existing,
-          url: buildPublicUrl(
-            existing.bucket,
-            existing.path,
-            existing.url,
-            cfg,
-          ),
+          // ✅ netlik (opsiyonel ama faydalı)
+          asset_id: existing.id,
+          url: buildPublicUrl(existing.bucket, existing.path, existing.url, cfg),
           created_at: existing.created_at,
           updated_at: existing.updated_at,
         });
@@ -330,10 +327,12 @@ export const adminCreateAsset: RouteHandler = async (req, reply) => {
     });
   }
 
+  // ✅ A) asset_id alias
   const nowIso = new Date().toISOString();
 
   return reply.code(201).send({
     ...recBase,
+    asset_id: recBase.id, // ✅ netlik
     url: buildPublicUrl(recBase.bucket, recBase.path, recBase.url, cfg),
     created_at: nowIso,
     updated_at: nowIso,
@@ -376,10 +375,22 @@ export const adminPatchAsset: RouteHandler<{
     updated_at: dsql`CURRENT_TIMESTAMP(3)`,
   };
 
+  // ✅ B) local/cloudinary newPublicId ayrımı (TAM BLOK)
   if (folderChanged || nameChanged) {
+    const isLocal = (cur.provider || "") === "local";
+
     if (cur.provider_public_id) {
-      const baseName = targetName.replace(/^\//, "").replace(/\.[^.]+$/, "");
-      const newPublicId = targetFolder ? `${targetFolder}/${baseName}` : baseName;
+      let newPublicId: string;
+
+      if (isLocal) {
+        // ✅ LOCAL: provider_public_id dosya yolu (extension dahil)
+        // targetName zaten "photo.jpg" gibi ext içeriyor
+        newPublicId = targetFolder ? `${targetFolder}/${targetName}` : targetName;
+      } else {
+        // ✅ CLOUDINARY: public_id ext'siz
+        const baseName = targetName.replace(/^\//, "").replace(/\.[^.]+$/, "");
+        newPublicId = targetFolder ? `${targetFolder}/${baseName}` : baseName;
+      }
 
       const renamed = await renameCloudinaryPublicId(
         cur.provider_public_id,
@@ -430,8 +441,13 @@ export const adminDeleteAsset: RouteHandler<{
   const row = await getById(req.params.id);
   if (!row) return reply.code(404).send({ error: { message: "not_found" } });
 
+  // ✅ C) local’da ext kırpma yok (TAM BLOK)
   try {
-    const publicId = row.provider_public_id || row.path.replace(/\.[^.]+$/, "");
+    const isLocal = (row.provider || "") === "local";
+    const publicId =
+      row.provider_public_id ||
+      (isLocal ? row.path : row.path.replace(/\.[^.]+$/, ""));
+
     await destroyCloudinaryById(
       publicId,
       row.provider_resource_type || undefined,
@@ -449,16 +465,19 @@ export const adminDeleteAsset: RouteHandler<{
 export const adminBulkDelete: RouteHandler<{
   Body: { ids: string[] };
 }> = async (req, reply) => {
-  const ids = Array.isArray(req.body?.ids)
-    ? req.body.ids.filter(Boolean)
-    : [];
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids.filter(Boolean) : [];
   if (!ids.length) return reply.send({ deleted: 0 });
 
   const rows = await getByIds(ids);
   if (!rows.length) return reply.send({ deleted: 0 });
 
+  // ✅ D) local’da ext kırpma yok (TAM BLOK)
   for (const r of rows) {
-    const pid = r.provider_public_id || r.path.replace(/\.[^.]+$/, "");
+    const isLocal = (r.provider || "") === "local";
+    const pid =
+      r.provider_public_id ||
+      (isLocal ? r.path : r.path.replace(/\.[^.]+$/, ""));
+
     try {
       await destroyCloudinaryById(
         pid,
@@ -609,8 +628,7 @@ export const adminBulkCreateAssets: RouteHandler = async (req, reply) => {
       provider_public_id: up.public_id ?? null,
       provider_resource_type: (up.resource_type || "image") as string,
       provider_format: up.format ?? null,
-      provider_version:
-        typeof up.version === "number" ? up.version : null,
+      provider_version: typeof up.version === "number" ? up.version : null,
       metadata: formMeta,
     };
 
@@ -625,30 +643,29 @@ export const adminBulkCreateAssets: RouteHandler = async (req, reply) => {
         },
         "storage bulk upload: db insert succeeded",
       );
+
+      // ✅ E) item’lara asset_id ekle (success)
       out.push({
         ...recBase,
+        asset_id: recBase.id,
         url: buildPublicUrl(recBase.bucket, recBase.path, recBase.url, cfg),
       });
     } catch (e) {
       const err = e as { message?: string };
+
       if (isDup(err)) {
         const existing = await getByBucketPath(bucket, path);
         if (existing) {
           req.log.warn(
-            {
-              ...fileLog,
-              rec_id: existing.id,
-            },
+            { ...fileLog, rec_id: existing.id },
             "storage bulk upload: duplicate key, returning existing row",
           );
+
+          // ✅ E) duplicate existing’te de asset_id
           out.push({
             ...existing,
-            url: buildPublicUrl(
-              existing.bucket,
-              existing.path,
-              existing.url,
-              cfg,
-            ),
+            asset_id: existing.id,
+            url: buildPublicUrl(existing.bucket, existing.path, existing.url, cfg),
           });
           continue;
         }

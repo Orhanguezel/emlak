@@ -1,5 +1,5 @@
 // =============================================================
-// FILE: src/integrations/metahub/rtk/endpoints/site_settings.endpoints.ts (PUBLIC)
+// FILE: src/integrations/rtk/endpoints/site_settings.endpoints.ts (PUBLIC)
 // =============================================================
 import { baseApi } from "../baseApi";
 

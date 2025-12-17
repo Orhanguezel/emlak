@@ -2,7 +2,8 @@
 // FILE: src/modules/properties/admin.controller.ts (ADMIN)
 // =============================================================
 import type { RouteHandler } from "fastify";
-import { randomUUID } from "crypto";
+import { randomUUID } from "node:crypto";
+
 import {
   listPropertiesAdmin as listPropertiesAdminRepo,
   getPropertyByIdAdmin as getPropertyByIdAdminRepo,
@@ -10,7 +11,12 @@ import {
   createProperty as createPropertyRepo,
   updateProperty as updatePropertyRepo,
   deleteProperty as deletePropertyRepo,
+
+  // ✅ gallery helpers
+  replacePropertyAssets,
+  syncPropertyCoverFromAssets,
 } from "./repository";
+
 import {
   propertyListQuerySchema,
   upsertPropertyBodySchema,
@@ -20,45 +26,52 @@ import {
   type PatchPropertyBody,
 } from "./validation";
 
-const toBool = (v: unknown): boolean => v === true || v === 1 || v === "1" || v === "true";
+// -------------------------------------------------------------
+// Helpers
+// -------------------------------------------------------------
+const toBool = (v: unknown): boolean =>
+  v === true || v === 1 || v === "1" || v === "true";
 
-// DECIMAL(10,6) alanlarına string yazmak için normalize
 const dec6 = (v: number | string): string => {
   if (typeof v === "number") return v.toFixed(6);
   const n = Number(v);
   return Number.isFinite(n) ? n.toFixed(6) : String(v);
 };
 
-// DECIMAL(12,2) fiyat alanları normalize
 const dec2 = (v: number | string): string => {
   if (typeof v === "number") return v.toFixed(2);
   const n = Number(v);
   return Number.isFinite(n) ? n.toFixed(2) : String(v);
 };
 
-const trimOrUndef = (v: unknown): string | undefined => (typeof v === "string" ? v.trim() : undefined);
+const trimOrUndef = (v: unknown): string | undefined =>
+  typeof v === "string" ? v.trim() : undefined;
+
 const trimOrNull = (v: unknown): string | null | undefined => {
   if (typeof v === "undefined") return undefined;
   if (v === null) return null;
   if (typeof v === "string") return v.trim() || null;
   return null;
 };
-const numOrUndef = (v: unknown): number | undefined => {
+
+const intOrNull = (v: unknown): number | null | undefined => {
   if (typeof v === "undefined") return undefined;
+  if (v === null) return null;
   const n = typeof v === "number" ? v : Number(v);
-  return Number.isFinite(n) ? n : undefined;
-};
-const intOrUndef = (v: unknown): number | undefined => {
-  const n = numOrUndef(v);
-  if (typeof n === "undefined") return undefined;
-  return Number.isFinite(n) ? Math.trunc(n) : undefined;
+  return Number.isFinite(n) ? Math.trunc(n) : null;
 };
 
-/** LIST (admin) */
-export const listPropertiesAdmin: RouteHandler<{ Querystring: PropertyListQuery }> = async (req, reply) => {
+// -------------------------------------------------------------
+// LIST (admin)
+// -------------------------------------------------------------
+export const listPropertiesAdmin: RouteHandler<{
+  Querystring: PropertyListQuery;
+}> = async (req, reply) => {
   const parsed = propertyListQuerySchema.safeParse(req.query ?? {});
   if (!parsed.success) {
-    return reply.code(400).send({ error: { message: "invalid_query", issues: parsed.error.issues } });
+    return reply.code(400).send({
+      error: { message: "invalid_query", issues: parsed.error.issues },
+    });
   }
   const q = parsed.data;
 
@@ -74,46 +87,116 @@ export const listPropertiesAdmin: RouteHandler<{ Querystring: PropertyListQuery 
       featured: q.featured,
 
       q: q.q,
+      slug: q.slug,
       district: q.district,
       city: q.city,
       neighborhood: q.neighborhood,
       type: q.type,
       status: q.status,
-      slug: q.slug,
+
+      price_min: q.price_min,
+      price_max: q.price_max,
+      gross_m2_min: q.gross_m2_min,
+      gross_m2_max: q.gross_m2_max,
+      net_m2_min: q.net_m2_min,
+      net_m2_max: q.net_m2_max,
+
+      rooms: q.rooms,
+      bedrooms_min: q.bedrooms_min,
+      bedrooms_max: q.bedrooms_max,
+
+      building_age: q.building_age,
+
+      floor: q.floor,
+      floor_no_min: q.floor_no_min,
+      floor_no_max: q.floor_no_max,
+      total_floors_min: q.total_floors_min,
+      total_floors_max: q.total_floors_max,
+
+      heating: q.heating,
+      usage_status: q.usage_status,
+
+      furnished: q.furnished,
+      in_site: q.in_site,
+      has_balcony: q.has_balcony,
+      has_parking: q.has_parking,
+      has_elevator: q.has_elevator,
+      has_garden: q.has_garden,
+      has_terrace: q.has_terrace,
+      credit_eligible: q.credit_eligible,
+      swap: q.swap,
+      has_video: q.has_video,
+      has_clip: q.has_clip,
+      has_virtual_tour: q.has_virtual_tour,
+      has_map: q.has_map,
+      accessible: q.accessible,
+
+      created_from: q.created_from,
+      created_to: q.created_to,
     });
 
     reply.header("x-total-count", String(total ?? 0));
     return reply.send(items);
   } catch (err) {
-    req.log.error({ err }, "properties_list_failed");
-    return reply.code(500).send({ error: { message: "properties_list_failed" } });
+    req.log.error({ err }, "properties_admin_list_failed");
+    return reply
+      .code(500)
+      .send({ error: { message: "properties_admin_list_failed" } });
   }
 };
 
-/** GET BY ID (admin) */
-export const getPropertyAdmin: RouteHandler<{ Params: { id: string } }> = async (req, reply) => {
-  const row = await getPropertyByIdAdminRepo(req.params.id);
-  if (!row) return reply.code(404).send({ error: { message: "not_found" } });
-  return reply.send(row);
+// -------------------------------------------------------------
+// GET BY ID (admin)
+// -------------------------------------------------------------
+export const getPropertyAdmin: RouteHandler<{
+  Params: { id: string };
+}> = async (req, reply) => {
+  try {
+    const row = await getPropertyByIdAdminRepo(req.params.id);
+    if (!row) return reply.code(404).send({ error: { message: "not_found" } });
+    return reply.send(row);
+  } catch (err) {
+    req.log.error({ err }, "properties_admin_get_failed");
+    return reply
+      .code(500)
+      .send({ error: { message: "properties_admin_get_failed" } });
+  }
 };
 
-/** GET BY SLUG (admin) */
-export const getPropertyBySlugAdmin: RouteHandler<{ Params: { slug: string } }> = async (req, reply) => {
-  const row = await getPropertyBySlugAdminRepo(req.params.slug);
-  if (!row) return reply.code(404).send({ error: { message: "not_found" } });
-  return reply.send(row);
+// -------------------------------------------------------------
+// GET BY SLUG (admin)
+// -------------------------------------------------------------
+export const getPropertyBySlugAdmin: RouteHandler<{
+  Params: { slug: string };
+}> = async (req, reply) => {
+  try {
+    const row = await getPropertyBySlugAdminRepo(req.params.slug);
+    if (!row) return reply.code(404).send({ error: { message: "not_found" } });
+    return reply.send(row);
+  } catch (err) {
+    req.log.error({ err }, "properties_admin_get_by_slug_failed");
+    return reply.code(500).send({
+      error: { message: "properties_admin_get_by_slug_failed" },
+    });
+  }
 };
 
-/** CREATE (admin) */
-export const createPropertyAdmin: RouteHandler<{ Body: UpsertPropertyBody }> = async (req, reply) => {
+// -------------------------------------------------------------
+// CREATE (admin) - ✅ assets + cover sync + storage validation
+// -------------------------------------------------------------
+export const createPropertyAdmin: RouteHandler<{
+  Body: UpsertPropertyBody;
+}> = async (req, reply) => {
   const parsed = upsertPropertyBodySchema.safeParse(req.body ?? {});
   if (!parsed.success) {
-    return reply.code(400).send({ error: { message: "invalid_body", issues: parsed.error.issues } });
+    return reply
+      .code(400)
+      .send({ error: { message: "invalid_body", issues: parsed.error.issues } });
   }
   const b = parsed.data;
 
   try {
-    const row = await createPropertyRepo({
+    const created = await createPropertyRepo({
       id: randomUUID(),
 
       title: b.title.trim(),
@@ -124,67 +207,120 @@ export const createPropertyAdmin: RouteHandler<{ Body: UpsertPropertyBody }> = a
       address: b.address.trim(),
       district: b.district.trim(),
       city: b.city.trim(),
-
-      neighborhood: typeof b.neighborhood === "string" ? b.neighborhood.trim() : null,
+      neighborhood:
+        typeof b.neighborhood === "string" ? b.neighborhood.trim() : null,
 
       lat: dec6(b.coordinates.lat),
       lng: dec6(b.coordinates.lng),
 
-      description: typeof b.description === "string" ? b.description.trim() : b.description ?? null,
+      description:
+        typeof b.description === "string"
+          ? b.description.trim()
+          : b.description ?? null,
 
-      // fiyatlar
       price: typeof b.price === "number" ? dec2(b.price) : null,
       currency: (b.currency ?? "TRY").trim(),
-      min_price_admin: typeof b.min_price_admin === "number" ? dec2(b.min_price_admin) : null,
+      min_price_admin:
+        typeof b.min_price_admin === "number" ? dec2(b.min_price_admin) : null,
 
-      // meta
       listing_no: typeof b.listing_no === "string" ? b.listing_no.trim() : null,
-      badge_text: typeof b.badge_text === "string" ? b.badge_text.trim() : null,
+      badge_text:
+        typeof b.badge_text === "string" ? b.badge_text.trim() : null,
       featured: toBool(b.featured) ? 1 : 0,
 
-      // detay
       gross_m2: typeof b.gross_m2 === "number" ? b.gross_m2 : null,
       net_m2: typeof b.net_m2 === "number" ? b.net_m2 : null,
+
       rooms: typeof b.rooms === "string" ? b.rooms.trim() : null,
-      building_age: typeof b.building_age === "string" ? b.building_age.trim() : null,
+      bedrooms:
+        typeof b.bedrooms === "number" ? Math.trunc(b.bedrooms) : null,
+
+      building_age:
+        typeof b.building_age === "string" ? b.building_age.trim() : null,
+
       floor: typeof b.floor === "string" ? b.floor.trim() : null,
-      total_floors: typeof b.total_floors === "number" ? b.total_floors : null,
+      floor_no: typeof b.floor_no === "number" ? Math.trunc(b.floor_no) : null,
+      total_floors:
+        typeof b.total_floors === "number" ? Math.trunc(b.total_floors) : null,
 
       heating: typeof b.heating === "string" ? b.heating.trim() : null,
+      usage_status:
+        typeof b.usage_status === "string" ? b.usage_status.trim() : null,
+
       furnished: toBool(b.furnished) ? 1 : 0,
       in_site: toBool(b.in_site) ? 1 : 0,
       has_balcony: toBool(b.has_balcony) ? 1 : 0,
       has_parking: toBool(b.has_parking) ? 1 : 0,
       has_elevator: toBool(b.has_elevator) ? 1 : 0,
+      has_garden: toBool(b.has_garden) ? 1 : 0,
+      has_terrace: toBool(b.has_terrace) ? 1 : 0,
 
-      // görsel
+      credit_eligible: toBool(b.credit_eligible) ? 1 : 0,
+      swap: toBool(b.swap) ? 1 : 0,
+      has_video: toBool(b.has_video) ? 1 : 0,
+      has_clip: toBool(b.has_clip) ? 1 : 0,
+      has_virtual_tour: toBool(b.has_virtual_tour) ? 1 : 0,
+      has_map:
+        typeof b.has_map !== "undefined" ? (toBool(b.has_map) ? 1 : 0) : 1,
+      accessible: toBool(b.accessible) ? 1 : 0,
+
+      // legacy cover: assets gelirse sync override edebilir
       image_url: typeof b.image_url === "string" ? b.image_url.trim() : null,
-      image_asset_id: typeof b.image_asset_id === "string" ? b.image_asset_id.trim() : null,
+      image_asset_id:
+        typeof b.image_asset_id === "string" ? b.image_asset_id.trim() : null,
       alt: typeof b.alt === "string" ? b.alt.trim() : null,
 
       is_active: toBool(b.is_active) ? 1 : 0,
-      display_order: typeof b.display_order === "number" ? b.display_order : 0,
+      display_order:
+        typeof b.display_order === "number" ? Math.trunc(b.display_order) : 0,
 
       created_at: new Date(),
       updated_at: new Date(),
     });
 
-    return reply.code(201).send(row);
+    if (!created) {
+      return reply
+        .code(500)
+        .send({ error: { message: "properties_admin_create_failed" } });
+    }
+
+    // ✅ gallery replace + cover sync (assets is optional)
+    if (Array.isArray(b.assets)) {
+      await replacePropertyAssets(created.id, b.assets);
+      await syncPropertyCoverFromAssets(created.id);
+    }
+
+    const fresh = await getPropertyByIdAdminRepo(created.id);
+    return reply.code(201).send(fresh);
   } catch (err: unknown) {
-    const e = err as { code?: string };
+    const e = err as { code?: string; message?: string };
     if (e?.code === "ER_DUP_ENTRY") {
       return reply.code(409).send({ error: { message: "slug_already_exists" } });
     }
-    req.log.error({ err }, "properties_create_failed");
-    return reply.code(500).send({ error: { message: "properties_create_failed" } });
+    if (e?.message === "invalid_asset_ids") {
+      return reply.code(400).send({
+        error: { message: "invalid_asset_ids", details: "assets[].asset_id not found in storage_assets" },
+      });
+    }
+    req.log.error({ err }, "properties_admin_create_failed");
+    return reply
+      .code(500)
+      .send({ error: { message: "properties_admin_create_failed" } });
   }
 };
 
-/** UPDATE (admin, partial) */
-export const updatePropertyAdmin: RouteHandler<{ Params: { id: string }; Body: PatchPropertyBody }> = async (req, reply) => {
+// -------------------------------------------------------------
+// UPDATE (admin, partial) - ✅ assets replace + cover sync + validation
+// -------------------------------------------------------------
+export const updatePropertyAdmin: RouteHandler<{
+  Params: { id: string };
+  Body: PatchPropertyBody;
+}> = async (req, reply) => {
   const parsed = patchPropertyBodySchema.safeParse(req.body ?? {});
   if (!parsed.success) {
-    return reply.code(400).send({ error: { message: "invalid_body", issues: parsed.error.issues } });
+    return reply
+      .code(400)
+      .send({ error: { message: "invalid_body", issues: parsed.error.issues } });
   }
   const b = parsed.data;
 
@@ -215,58 +351,113 @@ export const updatePropertyAdmin: RouteHandler<{ Params: { id: string }; Body: P
     const neighborhood = trimOrNull(b.neighborhood);
     if (typeof neighborhood !== "undefined") patch.neighborhood = neighborhood;
 
-    const description = typeof b.description !== "undefined" ? (b.description ?? null) : undefined;
-    if (typeof description !== "undefined") patch.description = typeof description === "string" ? description.trim() : description;
+    if (typeof b.description !== "undefined") {
+      patch.description =
+        typeof b.description === "string" ? b.description.trim() : b.description ?? null;
+    }
 
+    // ✅ coordinates partial
     if (typeof b.coordinates?.lat !== "undefined") patch.lat = dec6(b.coordinates.lat);
     if (typeof b.coordinates?.lng !== "undefined") patch.lng = dec6(b.coordinates.lng);
 
+    // price
     if (typeof b.price !== "undefined") patch.price = b.price === null ? null : dec2(b.price);
     if (typeof b.currency !== "undefined") patch.currency = (b.currency ?? "TRY").trim();
-    if (typeof b.min_price_admin !== "undefined") patch.min_price_admin = b.min_price_admin === null ? null : dec2(b.min_price_admin);
+    if (typeof b.min_price_admin !== "undefined")
+      patch.min_price_admin = b.min_price_admin === null ? null : dec2(b.min_price_admin);
 
+    // meta
     if (typeof b.listing_no !== "undefined") patch.listing_no = b.listing_no ?? null;
     if (typeof b.badge_text !== "undefined") patch.badge_text = b.badge_text ?? null;
     if (typeof b.featured !== "undefined") patch.featured = toBool(b.featured) ? 1 : 0;
 
+    // m2
     if (typeof b.gross_m2 !== "undefined") patch.gross_m2 = b.gross_m2 ?? null;
     if (typeof b.net_m2 !== "undefined") patch.net_m2 = b.net_m2 ?? null;
+
+    // core filters
     if (typeof b.rooms !== "undefined") patch.rooms = b.rooms ?? null;
+    if (typeof b.bedrooms !== "undefined")
+      patch.bedrooms = b.bedrooms === null ? null : Math.trunc(b.bedrooms);
+
     if (typeof b.building_age !== "undefined") patch.building_age = b.building_age ?? null;
+
     if (typeof b.floor !== "undefined") patch.floor = b.floor ?? null;
+    const floorNo = intOrNull(b.floor_no);
+    if (typeof floorNo !== "undefined") patch.floor_no = floorNo;
+
     if (typeof b.total_floors !== "undefined") patch.total_floors = b.total_floors ?? null;
 
     if (typeof b.heating !== "undefined") patch.heating = b.heating ?? null;
+    if (typeof b.usage_status !== "undefined") patch.usage_status = b.usage_status ?? null;
+
+    // bools
     if (typeof b.furnished !== "undefined") patch.furnished = toBool(b.furnished) ? 1 : 0;
     if (typeof b.in_site !== "undefined") patch.in_site = toBool(b.in_site) ? 1 : 0;
     if (typeof b.has_balcony !== "undefined") patch.has_balcony = toBool(b.has_balcony) ? 1 : 0;
     if (typeof b.has_parking !== "undefined") patch.has_parking = toBool(b.has_parking) ? 1 : 0;
     if (typeof b.has_elevator !== "undefined") patch.has_elevator = toBool(b.has_elevator) ? 1 : 0;
+    if (typeof b.has_garden !== "undefined") patch.has_garden = toBool(b.has_garden) ? 1 : 0;
+    if (typeof b.has_terrace !== "undefined") patch.has_terrace = toBool(b.has_terrace) ? 1 : 0;
 
+    if (typeof b.credit_eligible !== "undefined") patch.credit_eligible = toBool(b.credit_eligible) ? 1 : 0;
+    if (typeof b.swap !== "undefined") patch.swap = toBool(b.swap) ? 1 : 0;
+    if (typeof b.has_video !== "undefined") patch.has_video = toBool(b.has_video) ? 1 : 0;
+    if (typeof b.has_clip !== "undefined") patch.has_clip = toBool(b.has_clip) ? 1 : 0;
+    if (typeof b.has_virtual_tour !== "undefined") patch.has_virtual_tour = toBool(b.has_virtual_tour) ? 1 : 0;
+    if (typeof b.has_map !== "undefined") patch.has_map = toBool(b.has_map) ? 1 : 0;
+    if (typeof b.accessible !== "undefined") patch.accessible = toBool(b.accessible) ? 1 : 0;
+
+    // legacy cover direct patch (assets gelirse sonra sync override eder)
     if (typeof b.image_url !== "undefined") patch.image_url = b.image_url ?? null;
     if (typeof b.image_asset_id !== "undefined") patch.image_asset_id = b.image_asset_id ?? null;
     if (typeof b.alt !== "undefined") patch.alt = b.alt ?? null;
 
     if (typeof b.is_active !== "undefined") patch.is_active = toBool(b.is_active) ? 1 : 0;
-    if (typeof b.display_order !== "undefined") patch.display_order = typeof b.display_order === "number" ? b.display_order : undefined;
+    if (typeof b.display_order !== "undefined")
+      patch.display_order = typeof b.display_order === "number" ? Math.trunc(b.display_order) : 0;
 
-    const patched = await updatePropertyRepo(req.params.id, patch);
+    const updated = await updatePropertyRepo(req.params.id, patch);
+    if (!updated) return reply.code(404).send({ error: { message: "not_found" } });
 
-    if (!patched) return reply.code(404).send({ error: { message: "not_found" } });
-    return reply.send(patched);
+    // ✅ assets replace is explicit: even empty array clears gallery & cover
+    if (Array.isArray(b.assets)) {
+      await replacePropertyAssets(req.params.id, b.assets);
+      await syncPropertyCoverFromAssets(req.params.id);
+    }
+
+    const fresh = await getPropertyByIdAdminRepo(req.params.id);
+    return reply.send(fresh);
   } catch (err: unknown) {
-    const e = err as { code?: string };
+    const e = err as { code?: string; message?: string };
     if (e?.code === "ER_DUP_ENTRY") {
       return reply.code(409).send({ error: { message: "slug_already_exists" } });
     }
-    req.log.error({ err }, "properties_update_failed");
-    return reply.code(500).send({ error: { message: "properties_update_failed" } });
+    if (e?.message === "invalid_asset_ids") {
+      return reply.code(400).send({
+        error: { message: "invalid_asset_ids", details: "assets[].asset_id not found in storage_assets" },
+      });
+    }
+    req.log.error({ err }, "properties_admin_update_failed");
+    return reply
+      .code(500)
+      .send({ error: { message: "properties_admin_update_failed" } });
   }
 };
 
-/** DELETE (admin) */
-export const removePropertyAdmin: RouteHandler<{ Params: { id: string } }> = async (req, reply) => {
-  const affected = await deletePropertyRepo(req.params.id);
-  if (!affected) return reply.code(404).send({ error: { message: "not_found" } });
-  return reply.code(204).send();
+// -------------------------------------------------------------
+// DELETE (admin) - ✅ property_assets + related storage cleanup
+// -------------------------------------------------------------
+export const removePropertyAdmin: RouteHandler<{ Params: { id: string } }> = async (
+  req,
+  reply,
+) => {
+  try {
+    const affected = await deletePropertyRepo(req.params.id);
+    if (!affected) return reply.code(404).send({ error: { message: "not_found" } });
+    return reply.code(204).send();
+  } catch (err) {
+    req.log.error({ err }, "properties_admin_delete_failed");
+    return reply.code(500).send({ error: { message: "properties_admin_delete_failed" } });
+  }
 };

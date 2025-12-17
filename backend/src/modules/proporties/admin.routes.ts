@@ -20,4 +20,3 @@ export async function registerPropertiesAdmin(app: FastifyInstance) {
   app.patch(`${BASE}/:id`, { config: { auth: true } }, updatePropertyAdmin);
   app.delete(`${BASE}/:id`, { config: { auth: true } }, removePropertyAdmin);
 }
-
