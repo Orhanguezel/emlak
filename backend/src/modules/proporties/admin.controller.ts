@@ -4,12 +4,12 @@
 import type { RouteHandler } from "fastify";
 import { randomUUID } from "crypto";
 import {
-  listPropertiesAdmin,
-  getPropertyByIdAdmin,
-  getPropertyBySlugAdmin,
-  createProperty,
-  updateProperty,
-  deleteProperty,
+  listPropertiesAdmin as listPropertiesAdminRepo,
+  getPropertyByIdAdmin as getPropertyByIdAdminRepo,
+  getPropertyBySlugAdmin as getPropertyBySlugAdminRepo,
+  createProperty as createPropertyRepo,
+  updateProperty as updatePropertyRepo,
+  deleteProperty as deletePropertyRepo,
 } from "./repository";
 import {
   propertyListQuerySchema,
@@ -43,13 +43,11 @@ const trimOrNull = (v: unknown): string | null | undefined => {
   if (typeof v === "string") return v.trim() || null;
   return null;
 };
-
 const numOrUndef = (v: unknown): number | undefined => {
   if (typeof v === "undefined") return undefined;
   const n = typeof v === "number" ? v : Number(v);
   return Number.isFinite(n) ? n : undefined;
 };
-
 const intOrUndef = (v: unknown): number | undefined => {
   const n = numOrUndef(v);
   if (typeof n === "undefined") return undefined;
@@ -57,10 +55,7 @@ const intOrUndef = (v: unknown): number | undefined => {
 };
 
 /** LIST (admin) */
-export const listPropertiesAdminController: RouteHandler<{ Querystring: PropertyListQuery }> = async (
-  req,
-  reply,
-) => {
+export const listPropertiesAdmin: RouteHandler<{ Querystring: PropertyListQuery }> = async (req, reply) => {
   const parsed = propertyListQuerySchema.safeParse(req.query ?? {});
   if (!parsed.success) {
     return reply.code(400).send({ error: { message: "invalid_query", issues: parsed.error.issues } });
@@ -68,7 +63,7 @@ export const listPropertiesAdminController: RouteHandler<{ Querystring: Property
   const q = parsed.data;
 
   try {
-    const { items, total } = await listPropertiesAdmin({
+    const { items, total } = await listPropertiesAdminRepo({
       orderParam: typeof q.order === "string" ? q.order : undefined,
       sort: q.sort,
       order: q.orderDir,
@@ -96,24 +91,21 @@ export const listPropertiesAdminController: RouteHandler<{ Querystring: Property
 };
 
 /** GET BY ID (admin) */
-export const getPropertyAdminController: RouteHandler<{ Params: { id: string } }> = async (req, reply) => {
-  const row = await getPropertyByIdAdmin(req.params.id);
+export const getPropertyAdmin: RouteHandler<{ Params: { id: string } }> = async (req, reply) => {
+  const row = await getPropertyByIdAdminRepo(req.params.id);
   if (!row) return reply.code(404).send({ error: { message: "not_found" } });
   return reply.send(row);
 };
 
 /** GET BY SLUG (admin) */
-export const getPropertyBySlugAdminController: RouteHandler<{ Params: { slug: string } }> = async (
-  req,
-  reply,
-) => {
-  const row = await getPropertyBySlugAdmin(req.params.slug);
+export const getPropertyBySlugAdmin: RouteHandler<{ Params: { slug: string } }> = async (req, reply) => {
+  const row = await getPropertyBySlugAdminRepo(req.params.slug);
   if (!row) return reply.code(404).send({ error: { message: "not_found" } });
   return reply.send(row);
 };
 
 /** CREATE (admin) */
-export const createPropertyAdminController: RouteHandler<{ Body: UpsertPropertyBody }> = async (req, reply) => {
+export const createPropertyAdmin: RouteHandler<{ Body: UpsertPropertyBody }> = async (req, reply) => {
   const parsed = upsertPropertyBodySchema.safeParse(req.body ?? {});
   if (!parsed.success) {
     return reply.code(400).send({ error: { message: "invalid_body", issues: parsed.error.issues } });
@@ -121,7 +113,7 @@ export const createPropertyAdminController: RouteHandler<{ Body: UpsertPropertyB
   const b = parsed.data;
 
   try {
-    const row = await createProperty({
+    const row = await createPropertyRepo({
       id: randomUUID(),
 
       title: b.title.trim(),
@@ -189,10 +181,7 @@ export const createPropertyAdminController: RouteHandler<{ Body: UpsertPropertyB
 };
 
 /** UPDATE (admin, partial) */
-export const updatePropertyAdminController: RouteHandler<{ Params: { id: string }; Body: PatchPropertyBody }> = async (
-  req,
-  reply,
-) => {
+export const updatePropertyAdmin: RouteHandler<{ Params: { id: string }; Body: PatchPropertyBody }> = async (req, reply) => {
   const parsed = patchPropertyBodySchema.safeParse(req.body ?? {});
   if (!parsed.success) {
     return reply.code(400).send({ error: { message: "invalid_body", issues: parsed.error.issues } });
@@ -202,7 +191,6 @@ export const updatePropertyAdminController: RouteHandler<{ Params: { id: string 
   try {
     const patch: Record<string, any> = {};
 
-    // zorunlu stringler (patch)
     const title = trimOrUndef(b.title);
     if (typeof title !== "undefined") patch.title = title;
 
@@ -224,29 +212,23 @@ export const updatePropertyAdminController: RouteHandler<{ Params: { id: string 
     const city = trimOrUndef(b.city);
     if (typeof city !== "undefined") patch.city = city;
 
-    // nullable stringler
     const neighborhood = trimOrNull(b.neighborhood);
     if (typeof neighborhood !== "undefined") patch.neighborhood = neighborhood;
 
     const description = typeof b.description !== "undefined" ? (b.description ?? null) : undefined;
     if (typeof description !== "undefined") patch.description = typeof description === "string" ? description.trim() : description;
 
-    // coords
     if (typeof b.coordinates?.lat !== "undefined") patch.lat = dec6(b.coordinates.lat);
     if (typeof b.coordinates?.lng !== "undefined") patch.lng = dec6(b.coordinates.lng);
 
-    // fiyatlar
     if (typeof b.price !== "undefined") patch.price = b.price === null ? null : dec2(b.price);
     if (typeof b.currency !== "undefined") patch.currency = (b.currency ?? "TRY").trim();
-    if (typeof b.min_price_admin !== "undefined")
-      patch.min_price_admin = b.min_price_admin === null ? null : dec2(b.min_price_admin);
+    if (typeof b.min_price_admin !== "undefined") patch.min_price_admin = b.min_price_admin === null ? null : dec2(b.min_price_admin);
 
-    // meta
     if (typeof b.listing_no !== "undefined") patch.listing_no = b.listing_no ?? null;
     if (typeof b.badge_text !== "undefined") patch.badge_text = b.badge_text ?? null;
     if (typeof b.featured !== "undefined") patch.featured = toBool(b.featured) ? 1 : 0;
 
-    // detay
     if (typeof b.gross_m2 !== "undefined") patch.gross_m2 = b.gross_m2 ?? null;
     if (typeof b.net_m2 !== "undefined") patch.net_m2 = b.net_m2 ?? null;
     if (typeof b.rooms !== "undefined") patch.rooms = b.rooms ?? null;
@@ -261,17 +243,14 @@ export const updatePropertyAdminController: RouteHandler<{ Params: { id: string 
     if (typeof b.has_parking !== "undefined") patch.has_parking = toBool(b.has_parking) ? 1 : 0;
     if (typeof b.has_elevator !== "undefined") patch.has_elevator = toBool(b.has_elevator) ? 1 : 0;
 
-    // görsel
     if (typeof b.image_url !== "undefined") patch.image_url = b.image_url ?? null;
     if (typeof b.image_asset_id !== "undefined") patch.image_asset_id = b.image_asset_id ?? null;
     if (typeof b.alt !== "undefined") patch.alt = b.alt ?? null;
 
-    // yayın/sıralama
     if (typeof b.is_active !== "undefined") patch.is_active = toBool(b.is_active) ? 1 : 0;
-    if (typeof b.display_order !== "undefined")
-      patch.display_order = typeof b.display_order === "number" ? b.display_order : undefined;
+    if (typeof b.display_order !== "undefined") patch.display_order = typeof b.display_order === "number" ? b.display_order : undefined;
 
-    const patched = await updateProperty(req.params.id, patch);
+    const patched = await updatePropertyRepo(req.params.id, patch);
 
     if (!patched) return reply.code(404).send({ error: { message: "not_found" } });
     return reply.send(patched);
@@ -286,8 +265,8 @@ export const updatePropertyAdminController: RouteHandler<{ Params: { id: string 
 };
 
 /** DELETE (admin) */
-export const removePropertyAdminController: RouteHandler<{ Params: { id: string } }> = async (req, reply) => {
-  const affected = await deleteProperty(req.params.id);
+export const removePropertyAdmin: RouteHandler<{ Params: { id: string } }> = async (req, reply) => {
+  const affected = await deletePropertyRepo(req.params.id);
   if (!affected) return reply.code(404).send({ error: { message: "not_found" } });
   return reply.code(204).send();
 };

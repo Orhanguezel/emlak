@@ -1,4 +1,4 @@
-// src/modules/proporties/admin.routes.ts
+// src/modules/properties/admin.routes.ts
 import type { FastifyInstance } from "fastify";
 import {
   listPropertiesAdmin,
@@ -20,3 +20,4 @@ export async function registerPropertiesAdmin(app: FastifyInstance) {
   app.patch(`${BASE}/:id`, { config: { auth: true } }, updatePropertyAdmin);
   app.delete(`${BASE}/:id`, { config: { auth: true } }, removePropertyAdmin);
 }
+
