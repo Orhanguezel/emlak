@@ -55,6 +55,7 @@ export const listPropertiesPublic: RouteHandler<{ Querystring: PropertyListQuery
 
       // oda
       rooms: q.rooms,
+      rooms_multi: q.rooms_multi, // ✅ NEW
       bedrooms_min: q.bedrooms_min,
       bedrooms_max: q.bedrooms_max,
 
@@ -70,7 +71,9 @@ export const listPropertiesPublic: RouteHandler<{ Querystring: PropertyListQuery
 
       // ısıtma / kullanım
       heating: q.heating,
+      heating_multi: q.heating_multi, // ✅ NEW
       usage_status: q.usage_status,
+      usage_status_multi: q.usage_status_multi, // ✅ NEW
 
       // bool filtreler
       furnished: q.furnished,
@@ -179,4 +182,3 @@ export const listStatusesPublic: RouteHandler = async (req, reply) => {
     return reply.code(500).send({ error: { message: "properties_public_statuses_failed" } });
   }
 };
-

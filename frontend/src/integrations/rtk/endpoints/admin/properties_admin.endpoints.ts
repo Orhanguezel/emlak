@@ -8,8 +8,9 @@ import type {
   PropertyAsset,
 } from "@/integrations/rtk/types/properties";
 
+// Admin list params: backend propertyListQuerySchema ile uyumlu
 export type AdminListParams = {
-  q?: string; // ✅ BE: propertyListQuerySchema.q
+  q?: string;
   slug?: string;
 
   district?: string;
@@ -22,7 +23,6 @@ export type AdminListParams = {
   featured?: BoolLike;
   is_active?: BoolLike;
 
-  // price/m2/room filters (opsiyonel ama BE destekliyor)
   price_min?: number;
   price_max?: number;
 
@@ -32,7 +32,10 @@ export type AdminListParams = {
   net_m2_min?: number;
   net_m2_max?: number;
 
+  // legacy
   rooms?: string;
+  // ✅ multi
+  rooms_multi?: string[]; // BE preprocess: a,b veya dizi
 
   bedrooms_min?: number;
   bedrooms_max?: number;
@@ -46,8 +49,15 @@ export type AdminListParams = {
   total_floors_min?: number;
   total_floors_max?: number;
 
+  // legacy
   heating?: string;
+  // ✅ multi
+  heating_multi?: string[];
+
+  // legacy
   usage_status?: string;
+  // ✅ multi
+  usage_status_multi?: string[];
 
   furnished?: BoolLike;
   in_site?: BoolLike;
@@ -68,8 +78,8 @@ export type AdminListParams = {
   has_map?: BoolLike;
   accessible?: BoolLike;
 
-  created_from?: string; // ISO datetime
-  created_to?: string;   // ISO datetime
+  created_from?: string;
+  created_to?: string;
 
   sort?: "created_at" | "updated_at" | "price" | "gross_m2" | "net_m2";
   orderDir?: "asc" | "desc";
@@ -77,15 +87,10 @@ export type AdminListParams = {
   limit?: number;
   offset?: number;
 
-  // BE: select passthrough (opsiyonel)
   select?: string;
 };
 
-/**
- * ✅ BE Upsert ile uyumlu (upsertPropertyBodySchema)
- * - coordinates zorunlu
- * - assets opsiyonel
- */
+// ✅ BE upsertPropertyBodySchema ile uyumlu
 export type PropertyUpsertBody = {
   title: string;
   slug: string;
@@ -119,17 +124,25 @@ export type PropertyUpsertBody = {
   gross_m2?: number | null;
   net_m2?: number | null;
 
-  // filtre çekirdek
+  // legacy + ✅ multi
   rooms?: string | null;
+  rooms_multi?: string[] | null;
+
   bedrooms?: number | null;
   building_age?: string | null;
 
   floor?: string | null;
   floor_no?: number | null;
+
   total_floors?: number | null;
 
+  // legacy + ✅ multi
   heating?: string | null;
+  heating_multi?: string[] | null;
+
+  // legacy + ✅ multi
   usage_status?: string | null;
+  usage_status_multi?: string[] | null;
 
   // bool filtreler
   furnished?: BoolLike;
@@ -163,10 +176,7 @@ export type PropertyUpsertBody = {
   assets?: PropertyAsset[];
 };
 
-/**
- * ✅ BE Patch ile uyumlu (patchPropertyBodySchema)
- * - coordinates partial
- */
+// ✅ BE patchPropertyBodySchema ile uyumlu
 export type PropertyPatchBody = Partial<Omit<PropertyUpsertBody, "coordinates">> & {
   coordinates?: { lat?: number; lng?: number };
 };
@@ -175,7 +185,6 @@ const buildParams = (q?: AdminListParams): Record<string, any> => {
   if (!q) return {};
   const out: Record<string, any> = {};
 
-  // birebir pass-through (BE schema ile aynı isimler)
   const keys: Array<keyof AdminListParams> = [
     "q",
     "slug",
@@ -193,6 +202,7 @@ const buildParams = (q?: AdminListParams): Record<string, any> => {
     "net_m2_min",
     "net_m2_max",
     "rooms",
+    "rooms_multi",
     "bedrooms_min",
     "bedrooms_max",
     "building_age",
@@ -202,7 +212,9 @@ const buildParams = (q?: AdminListParams): Record<string, any> => {
     "total_floors_min",
     "total_floors_max",
     "heating",
+    "heating_multi",
     "usage_status",
+    "usage_status_multi",
     "furnished",
     "in_site",
     "has_elevator",
@@ -261,6 +273,25 @@ const toStrOrNull = (v: unknown): string | null => {
   return v == null ? null : String(v);
 };
 
+const toArrayOrNull = (v: unknown): string[] | null => {
+  if (v == null) return null;
+  if (Array.isArray(v)) return v.map(String).map((s) => s.trim()).filter(Boolean);
+  // bazı BE’ler JSON'u string dönebilir; güvenlik için:
+  if (typeof v === "string") {
+    const s = v.trim();
+    if (!s) return null;
+    try {
+      const parsed = JSON.parse(s);
+      if (Array.isArray(parsed)) return parsed.map(String).map((x) => x.trim()).filter(Boolean);
+    } catch {
+      // "a,b" gibi bir şey gelirse:
+      if (s.includes(",")) return s.split(",").map((x) => x.trim()).filter(Boolean);
+      return [s];
+    }
+  }
+  return null;
+};
+
 function toView(r: any): PropertyAdminView {
   const coords = r?.coordinates
     ? {
@@ -306,7 +337,11 @@ function toView(r: any): PropertyAdminView {
     gross_m2: typeof r.gross_m2 !== "undefined" ? toIntOrNull(r.gross_m2) : null,
     net_m2: typeof r.net_m2 !== "undefined" ? toIntOrNull(r.net_m2) : null,
 
+    // legacy + ✅ multi
     rooms: typeof r.rooms !== "undefined" ? (r.rooms ?? null) : null,
+    rooms_multi:
+      typeof r.rooms_multi !== "undefined" ? toArrayOrNull(r.rooms_multi) : null,
+
     bedrooms:
       typeof r.bedrooms !== "undefined" ? toIntOrNull(r.bedrooms) : null,
     building_age:
@@ -320,9 +355,19 @@ function toView(r: any): PropertyAdminView {
         ? toIntOrNull(r.total_floors)
         : null,
 
+    // legacy + ✅ multi
     heating: typeof r.heating !== "undefined" ? (r.heating ?? null) : null,
+    heating_multi:
+      typeof r.heating_multi !== "undefined"
+        ? toArrayOrNull(r.heating_multi)
+        : null,
+
     usage_status:
       typeof r.usage_status !== "undefined" ? (r.usage_status ?? null) : null,
+    usage_status_multi:
+      typeof r.usage_status_multi !== "undefined"
+        ? toArrayOrNull(r.usage_status_multi)
+        : null,
 
     furnished: toBool(r.furnished),
     in_site: toBool(r.in_site),
@@ -364,20 +409,27 @@ function toView(r: any): PropertyAdminView {
     created_at: String(r.created_at ?? ""),
     updated_at: String(r.updated_at ?? ""),
 
-    // NOTE: admin detail endpoint assets döndürüyorsa map’le
+    // assets detail endpoint’te dönebilir
     assets: Array.isArray(r.assets)
       ? r.assets.map((a: any) => ({
           id: String(a.id ?? ""),
-          property_id: typeof a.property_id !== "undefined" ? String(a.property_id) : undefined,
+          property_id:
+            typeof a.property_id !== "undefined" ? String(a.property_id) : undefined,
           asset_id: typeof a.asset_id !== "undefined" ? (a.asset_id ?? null) : null,
           url: typeof a.url !== "undefined" ? (a.url ?? null) : null,
           alt: typeof a.alt !== "undefined" ? (a.alt ?? null) : null,
           kind: (a.kind ?? "image") as any,
           mime: typeof a.mime !== "undefined" ? (a.mime ?? null) : null,
-          is_cover: typeof a.is_cover === "boolean" ? a.is_cover : toBool(a.is_cover),
-          display_order: typeof a.display_order === "number" ? a.display_order : Number(a.display_order ?? 0),
-          created_at: typeof a.created_at !== "undefined" ? String(a.created_at) : undefined,
-          updated_at: typeof a.updated_at !== "undefined" ? String(a.updated_at) : undefined,
+          is_cover:
+            typeof a.is_cover === "boolean" ? a.is_cover : toBool(a.is_cover),
+          display_order:
+            typeof a.display_order === "number"
+              ? a.display_order
+              : Number(a.display_order ?? 0),
+          created_at:
+            typeof a.created_at !== "undefined" ? String(a.created_at) : undefined,
+          updated_at:
+            typeof a.updated_at !== "undefined" ? String(a.updated_at) : undefined,
         }))
       : undefined,
   };

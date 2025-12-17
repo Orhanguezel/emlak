@@ -1,4 +1,6 @@
-// src/modules/properties/admin.routes.ts
+// =============================================================
+// FILE: src/modules/properties/admin.routes.ts
+// =============================================================
 import type { FastifyInstance } from "fastify";
 import {
   listPropertiesAdmin,

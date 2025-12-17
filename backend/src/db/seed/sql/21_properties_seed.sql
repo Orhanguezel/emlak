@@ -1,10 +1,8 @@
 -- =============================================================
 -- FILE: 21_properties_seed.sql
--- Seed for properties + property_assets (new schema compatible)
--- Notes:
--- - image_url: Unsplash demo
--- - asset_id: NULL (storage relation yoksa)
--- - lat/lng: Istanbul örnek koordinatlar
+-- Seed for properties + property_assets (FINAL schema compatible)
+-- Added:
+-- - created_at / updated_at set explicitly for "kaç gündür yayında" testi
 -- =============================================================
 
 SET NAMES utf8mb4;
@@ -31,14 +29,15 @@ INSERT INTO `properties`
 
   `gross_m2`, `net_m2`,
 
-  `rooms`, `bedrooms`,
+  `rooms`, `rooms_multi`,
+  `bedrooms`,
   `building_age`,
 
   `floor`, `floor_no`,
   `total_floors`,
 
-  `heating`,
-  `usage_status`,
+  `heating`, `heating_multi`,
+  `usage_status`, `usage_status_multi`,
 
   `furnished`, `in_site`,
   `has_elevator`, `has_parking`, `has_balcony`,
@@ -51,10 +50,12 @@ INSERT INTO `properties`
 
   `image_url`, `image_asset_id`, `alt`,
 
-  `display_order`, `is_active`
+  `display_order`, `is_active`,
+
+  `created_at`, `updated_at`
 )
 VALUES
--- ================= 1) Kadıköy / Moda =================
+-- ================= 1) Kadıköy / Moda (3 gündür) =================
 (
   '11111111-1111-4111-8111-111111111111',
   'Kadıköy Moda’da Ferah 2+1, Balkonlu', 'kadikoy-moda-ferah-2-1-balkonlu',
@@ -75,14 +76,15 @@ VALUES
 
   110, 92,
 
-  '2+1', 2,
+  '2+1', JSON_ARRAY('2+1'),
+  2,
   '5-10',
 
   '3', 3,
   6,
 
-  'Kombi',
-  'bos',
+  'kombi', JSON_ARRAY('kombi'),
+  'bos', JSON_ARRAY('bos'),
 
   0, 1,
   1, 0, 1,
@@ -93,15 +95,17 @@ VALUES
   0, 0, 1,
   1, 1,
 
-  -- legacy cover (galerinin cover'ı ile aynı)
   'https://images.unsplash.com/photo-1568605114967-8130f3a36994?fm=jpg&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&ixlib=rb-4.0.3&q=60&w=2400',
   NULL,
   'Kadıköy Moda ferah daire (örnek görsel)',
 
-  0, 1
+  0, 1,
+
+  DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL 3 DAY),
+  DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL 1 DAY)
 ),
 
--- ================= 2) Beşiktaş / Levent =================
+-- ================= 2) Beşiktaş / Levent (5 gündür) =================
 (
   '22222222-2222-4222-8222-222222222222',
   'Levent’te Site İçi 3+1, Otoparklı, Asansörlü', 'levent-site-ici-3-1-otoparkli-asansorlu',
@@ -122,14 +126,15 @@ VALUES
 
   185, 160,
 
-  '3+1', 3,
+  '3+1', JSON_ARRAY('3+1'),
+  3,
   '0-5',
 
   '14', 14,
   22,
 
-  'Merkezi',
-  'ev_sahibi',
+  'merkezi', JSON_ARRAY('merkezi'),
+  'ev_sahibi', JSON_ARRAY('ev_sahibi'),
 
   0, 1,
   1, 1, 1,
@@ -144,10 +149,13 @@ VALUES
   NULL,
   'Levent site içi modern daire (örnek görsel)',
 
-  1, 1
+  1, 1,
+
+  DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL 5 DAY),
+  DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL 2 DAY)
 ),
 
--- ================= 3) Şişli / Mecidiyeköy (kiralık) =================
+-- ================= 3) Şişli / Mecidiyeköy (bugün) =================
 (
   '33333333-3333-4333-8333-333333333333',
   'Mecidiyeköy’de Eşyalı 1+1, Metroya Yakın', 'mecidiyekoy-esyali-1-1-metroya-yakin',
@@ -167,14 +175,15 @@ VALUES
 
   65, 55,
 
-  '1+1', 1,
+  '1+1', JSON_ARRAY('1+1'),
+  1,
   '10+',
 
   '7', 7,
   12,
 
-  'Kombi',
-  'bos',
+  'kombi', JSON_ARRAY('kombi'),
+  'bos', JSON_ARRAY('bos'),
 
   1, 1,
   1, 0, 0,
@@ -189,10 +198,13 @@ VALUES
   NULL,
   'Mecidiyeköy eşyalı 1+1 (örnek görsel)',
 
-  2, 1
+  2, 1,
+
+  CURRENT_TIMESTAMP(3),
+  CURRENT_TIMESTAMP(3)
 ),
 
--- ================= 4) Üsküdar / Kuzguncuk =================
+-- ================= 4) Üsküdar / Kuzguncuk (12 gündür) =================
 (
   '44444444-4444-4444-8444-444444444444',
   'Kuzguncuk’ta Boğaz Havası, 2+1, Sessiz Sokak', 'kuzguncuk-bogaz-havasi-2-1-sessiz-sokak',
@@ -212,14 +224,15 @@ VALUES
 
   105, 90,
 
-  '2+1', 2,
+  '2+1', JSON_ARRAY('2+1'),
+  2,
   '10+',
 
   '2', 2,
   4,
 
-  'Kombi',
-  'kiracili',
+  'kombi', JSON_ARRAY('kombi'),
+  'kiracili', JSON_ARRAY('kiracili'),
 
   0, 0,
   0, 0, 1,
@@ -234,10 +247,13 @@ VALUES
   NULL,
   'Kuzguncuk sokak ve ev atmosferi (örnek görsel)',
 
-  3, 1
+  3, 1,
+
+  DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL 12 DAY),
+  DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL 4 DAY)
 ),
 
--- ================= 5) Ataşehir / Finans Merkezi =================
+-- ================= 5) Ataşehir / Finans Merkezi (30 gündür) =================
 (
   '55555555-5555-4555-8555-555555555555',
   'Ataşehir Finans Merkezine Yakın 4+1, Aileye Uygun', 'atasehir-finans-merkezine-yakin-4-1-aileye-uygun',
@@ -258,14 +274,15 @@ VALUES
 
   210, 185,
 
-  '4+1', 4,
+  '4+1', JSON_ARRAY('4+1'),
+  4,
   '0-5',
 
   '18', 18,
   24,
 
-  'Merkezi',
-  'bos',
+  'merkezi', JSON_ARRAY('merkezi'),
+  'bos', JSON_ARRAY('bos'),
 
   0, 1,
   1, 1, 1,
@@ -280,10 +297,13 @@ VALUES
   NULL,
   'Ataşehir aileye uygun geniş daire (örnek görsel)',
 
-  4, 1
+  4, 1,
+
+  DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL 30 DAY),
+  DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL 10 DAY)
 ),
 
--- ================= 6) Beylikdüzü / Marina (satıldı örneği) =================
+-- ================= 6) Beylikdüzü / Marina (satıldı, 60 gün önce açılmış) =================
 (
   '66666666-6666-4666-8666-666666666666',
   'Satıldı: Beylikdüzü Marina Yakını 1+1', 'satildi-beylikduzu-marina-yakini-1-1',
@@ -302,14 +322,15 @@ VALUES
 
   60, 50,
 
-  '1+1', 1,
+  '1+1', JSON_ARRAY('1+1'),
+  1,
   '5-10',
 
   '9', 9,
   14,
 
-  'Kombi',
-  'bos',
+  'kombi', JSON_ARRAY('kombi'),
+  'bos', JSON_ARRAY('bos'),
 
   0, 1,
   1, 1, 0,
@@ -324,70 +345,80 @@ VALUES
   NULL,
   'Beylikdüzü 1+1 (satıldı) örnek görsel',
 
-  5, 0
+  5, 0,
+
+  DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL 60 DAY),
+  DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL 1 DAY)
 )
 ON DUPLICATE KEY UPDATE
-  `title`            = VALUES(`title`),
-  `slug`             = VALUES(`slug`),
-  `type`             = VALUES(`type`),
-  `status`           = VALUES(`status`),
+  `title`              = VALUES(`title`),
+  `slug`               = VALUES(`slug`),
+  `type`               = VALUES(`type`),
+  `status`             = VALUES(`status`),
 
-  `address`          = VALUES(`address`),
-  `district`         = VALUES(`district`),
-  `city`             = VALUES(`city`),
-  `neighborhood`     = VALUES(`neighborhood`),
+  `address`            = VALUES(`address`),
+  `district`           = VALUES(`district`),
+  `city`               = VALUES(`city`),
+  `neighborhood`       = VALUES(`neighborhood`),
 
-  `lat`              = VALUES(`lat`),
-  `lng`              = VALUES(`lng`),
-  `description`      = VALUES(`description`),
+  `lat`                = VALUES(`lat`),
+  `lng`                = VALUES(`lng`),
+  `description`        = VALUES(`description`),
 
-  `price`            = VALUES(`price`),
-  `currency`         = VALUES(`currency`),
-  `min_price_admin`  = VALUES(`min_price_admin`),
+  `price`              = VALUES(`price`),
+  `currency`           = VALUES(`currency`),
+  `min_price_admin`    = VALUES(`min_price_admin`),
 
-  `listing_no`       = VALUES(`listing_no`),
-  `badge_text`       = VALUES(`badge_text`),
-  `featured`         = VALUES(`featured`),
+  `listing_no`         = VALUES(`listing_no`),
+  `badge_text`         = VALUES(`badge_text`),
+  `featured`           = VALUES(`featured`),
 
-  `gross_m2`         = VALUES(`gross_m2`),
-  `net_m2`           = VALUES(`net_m2`),
+  `gross_m2`           = VALUES(`gross_m2`),
+  `net_m2`             = VALUES(`net_m2`),
 
-  `rooms`            = VALUES(`rooms`),
-  `bedrooms`         = VALUES(`bedrooms`),
-  `building_age`     = VALUES(`building_age`),
+  `rooms`              = VALUES(`rooms`),
+  `rooms_multi`        = VALUES(`rooms_multi`),
 
-  `floor`            = VALUES(`floor`),
-  `floor_no`         = VALUES(`floor_no`),
-  `total_floors`     = VALUES(`total_floors`),
+  `bedrooms`           = VALUES(`bedrooms`),
+  `building_age`       = VALUES(`building_age`),
 
-  `heating`          = VALUES(`heating`),
-  `usage_status`     = VALUES(`usage_status`),
+  `floor`              = VALUES(`floor`),
+  `floor_no`           = VALUES(`floor_no`),
+  `total_floors`       = VALUES(`total_floors`),
 
-  `furnished`        = VALUES(`furnished`),
-  `in_site`          = VALUES(`in_site`),
+  `heating`            = VALUES(`heating`),
+  `heating_multi`      = VALUES(`heating_multi`),
 
-  `has_elevator`     = VALUES(`has_elevator`),
-  `has_parking`      = VALUES(`has_parking`),
-  `has_balcony`      = VALUES(`has_balcony`),
-  `has_garden`       = VALUES(`has_garden`),
-  `has_terrace`      = VALUES(`has_terrace`),
+  `usage_status`       = VALUES(`usage_status`),
+  `usage_status_multi` = VALUES(`usage_status_multi`),
 
-  `credit_eligible`  = VALUES(`credit_eligible`),
-  `swap`             = VALUES(`swap`),
+  `furnished`          = VALUES(`furnished`),
+  `in_site`            = VALUES(`in_site`),
 
-  `has_video`        = VALUES(`has_video`),
-  `has_clip`         = VALUES(`has_clip`),
-  `has_virtual_tour` = VALUES(`has_virtual_tour`),
-  `has_map`          = VALUES(`has_map`),
-  `accessible`       = VALUES(`accessible`),
+  `has_elevator`       = VALUES(`has_elevator`),
+  `has_parking`        = VALUES(`has_parking`),
+  `has_balcony`        = VALUES(`has_balcony`),
+  `has_garden`         = VALUES(`has_garden`),
+  `has_terrace`        = VALUES(`has_terrace`),
 
-  `image_url`        = VALUES(`image_url`),
-  `image_asset_id`   = VALUES(`image_asset_id`),
-  `alt`              = VALUES(`alt`),
+  `credit_eligible`    = VALUES(`credit_eligible`),
+  `swap`               = VALUES(`swap`),
 
-  `display_order`    = VALUES(`display_order`),
-  `is_active`        = VALUES(`is_active`),
-  `updated_at`       = CURRENT_TIMESTAMP(3);
+  `has_video`          = VALUES(`has_video`),
+  `has_clip`           = VALUES(`has_clip`),
+  `has_virtual_tour`   = VALUES(`has_virtual_tour`),
+  `has_map`            = VALUES(`has_map`),
+  `accessible`         = VALUES(`accessible`),
+
+  `image_url`          = VALUES(`image_url`),
+  `image_asset_id`     = VALUES(`image_asset_id`),
+  `alt`                = VALUES(`alt`),
+
+  `display_order`      = VALUES(`display_order`),
+  `is_active`          = VALUES(`is_active`),
+
+  -- created_at dokunma (ilk oluşturma tarihi kalsın)
+  `updated_at`         = CURRENT_TIMESTAMP(3);
 
 -- =============================================================
 -- PROPERTY_ASSETS (GALLERY)

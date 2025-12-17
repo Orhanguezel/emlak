@@ -1,6 +1,7 @@
 // =============================================================
 // FILE: src/modules/properties/schema.ts
 // Pattern: slider/schema.ts stili + Sahibinden benzeri alanlar
+// FINAL: enum + multi-select JSON kolonları + asset galerisi
 // =============================================================
 import {
   mysqlTable,
@@ -13,6 +14,7 @@ import {
   int,
   decimal,
   text,
+  json,
 } from "drizzle-orm/mysql-core";
 import { sql } from "drizzle-orm";
 
@@ -22,6 +24,7 @@ import { sql } from "drizzle-orm";
 // - filtrelenebilir çekirdek alanlar: oda/bina yaşı/kat/kat sayısı/ısınma/kullanım durumu
 // - bool filtreler: asansör/otopark/eşyalı/site içi vb.
 // - ✅ min_price_admin: sadece admin görecek
+// - ✅ multi-select: *_multi JSON string[] (legacy tekli alanlar korunur)
 // =============================================================
 export const properties = mysqlTable(
   "properties",
@@ -71,26 +74,33 @@ export const properties = mysqlTable(
     // ✅ Filtrelenecek çekirdek alanlar
     // =========================================================
     // Oda sayısı: UI genelde "2+1" gibi ister
-    rooms: varchar("rooms", { length: 16 }), // "2+1"
-    // Sayısal filtre kolaylığı için opsiyonel numeric kolon (önerilir)
+    rooms: varchar("rooms", { length: 16 }), // legacy tekli (örn "2+1")
+    // ✅ Multi-select (örn ["1+1","2+1"])
+    rooms_multi: json("rooms_multi").$type<string[] | null>(),
+
+    // Sayısal filtre kolaylığı için numeric kolon
     bedrooms: tinyint("bedrooms", { unsigned: true }), // 0..50
 
-    // Bina yaşı: "0", "5-10" gibi (Sahibinden yaklaşımı)
+    // Bina yaşı: "0", "5-10" gibi
     building_age: varchar("building_age", { length: 32 }),
 
     // Bulunduğu kat: UI'da "Zemin", "Bahçe" vs olabilir
     floor: varchar("floor", { length: 32 }),
-    // Range filtre için numeric floor_no (önerilir)
+    // Range filtre için numeric floor_no
     floor_no: int("floor_no"),
 
     // Kat sayısı
     total_floors: int("total_floors", { unsigned: true }),
 
-    // Isıtma (kombi, merkezi, klima, yerden vb.)
+    // Isıtma (legacy tekli)
     heating: varchar("heating", { length: 64 }),
+    // ✅ Multi-select (örn ["kombi","merkezi"])
+    heating_multi: json("heating_multi").$type<string[] | null>(),
 
-    // Kullanım durumu (Boş / Kiracılı / Ev sahibi)
+    // Kullanım durumu (legacy tekli)
     usage_status: varchar("usage_status", { length: 32 }), // bos|kiracili|ev_sahibi|...
+    // ✅ Multi-select
+    usage_status_multi: json("usage_status_multi").$type<string[] | null>(),
 
     // =========================================================
     // ✅ Bool filtreler (UI’daki toggle/kriterler)
@@ -254,6 +264,8 @@ export function rowToPublicView(r: PropertyRow) {
 
     // filtrelenen ana alanlar
     rooms: r.rooms ?? null,
+    rooms_multi: (r.rooms_multi ?? null) as string[] | null,
+
     bedrooms: r.bedrooms ?? null,
     building_age: r.building_age ?? null,
 
@@ -262,7 +274,10 @@ export function rowToPublicView(r: PropertyRow) {
     total_floors: r.total_floors ?? null,
 
     heating: r.heating ?? null,
+    heating_multi: (r.heating_multi ?? null) as string[] | null,
+
     usage_status: r.usage_status ?? null,
+    usage_status_multi: (r.usage_status_multi ?? null) as string[] | null,
 
     // bool filtreler
     furnished: toBool(r.furnished),

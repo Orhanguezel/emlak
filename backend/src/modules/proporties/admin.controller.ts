@@ -29,8 +29,7 @@ import {
 // -------------------------------------------------------------
 // Helpers
 // -------------------------------------------------------------
-const toBool = (v: unknown): boolean =>
-  v === true || v === 1 || v === "1" || v === "true";
+const toBool = (v: unknown): boolean => v === true || v === 1 || v === "1" || v === "true";
 
 const dec6 = (v: number | string): string => {
   if (typeof v === "number") return v.toFixed(6);
@@ -44,13 +43,15 @@ const dec2 = (v: number | string): string => {
   return Number.isFinite(n) ? n.toFixed(2) : String(v);
 };
 
-const trimOrUndef = (v: unknown): string | undefined =>
-  typeof v === "string" ? v.trim() : undefined;
+const trimOrUndef = (v: unknown): string | undefined => (typeof v === "string" ? v.trim() : undefined);
 
 const trimOrNull = (v: unknown): string | null | undefined => {
   if (typeof v === "undefined") return undefined;
   if (v === null) return null;
-  if (typeof v === "string") return v.trim() || null;
+  if (typeof v === "string") {
+    const s = v.trim();
+    return s ? s : null;
+  }
   return null;
 };
 
@@ -61,12 +62,22 @@ const intOrNull = (v: unknown): number | null | undefined => {
   return Number.isFinite(n) ? Math.trunc(n) : null;
 };
 
+const cleanStringArrayOrNull = (v: unknown): string[] | null | undefined => {
+  if (typeof v === "undefined") return undefined;
+  if (v === null) return null;
+  if (!Array.isArray(v)) return null;
+
+  const out = v
+    .map((x) => (typeof x === "string" ? x.trim() : String(x).trim()))
+    .filter(Boolean);
+
+  return out.length ? out : [];
+};
+
 // -------------------------------------------------------------
 // LIST (admin)
 // -------------------------------------------------------------
-export const listPropertiesAdmin: RouteHandler<{
-  Querystring: PropertyListQuery;
-}> = async (req, reply) => {
+export const listPropertiesAdmin: RouteHandler<{ Querystring: PropertyListQuery }> = async (req, reply) => {
   const parsed = propertyListQuerySchema.safeParse(req.query ?? {});
   if (!parsed.success) {
     return reply.code(400).send({
@@ -102,6 +113,7 @@ export const listPropertiesAdmin: RouteHandler<{
       net_m2_max: q.net_m2_max,
 
       rooms: q.rooms,
+      rooms_multi: q.rooms_multi, // ✅ NEW
       bedrooms_min: q.bedrooms_min,
       bedrooms_max: q.bedrooms_max,
 
@@ -114,7 +126,9 @@ export const listPropertiesAdmin: RouteHandler<{
       total_floors_max: q.total_floors_max,
 
       heating: q.heating,
+      heating_multi: q.heating_multi, // ✅ NEW
       usage_status: q.usage_status,
+      usage_status_multi: q.usage_status_multi, // ✅ NEW
 
       furnished: q.furnished,
       in_site: q.in_site,
@@ -139,59 +153,45 @@ export const listPropertiesAdmin: RouteHandler<{
     return reply.send(items);
   } catch (err) {
     req.log.error({ err }, "properties_admin_list_failed");
-    return reply
-      .code(500)
-      .send({ error: { message: "properties_admin_list_failed" } });
+    return reply.code(500).send({ error: { message: "properties_admin_list_failed" } });
   }
 };
 
 // -------------------------------------------------------------
 // GET BY ID (admin)
 // -------------------------------------------------------------
-export const getPropertyAdmin: RouteHandler<{
-  Params: { id: string };
-}> = async (req, reply) => {
+export const getPropertyAdmin: RouteHandler<{ Params: { id: string } }> = async (req, reply) => {
   try {
     const row = await getPropertyByIdAdminRepo(req.params.id);
     if (!row) return reply.code(404).send({ error: { message: "not_found" } });
     return reply.send(row);
   } catch (err) {
     req.log.error({ err }, "properties_admin_get_failed");
-    return reply
-      .code(500)
-      .send({ error: { message: "properties_admin_get_failed" } });
+    return reply.code(500).send({ error: { message: "properties_admin_get_failed" } });
   }
 };
 
 // -------------------------------------------------------------
 // GET BY SLUG (admin)
 // -------------------------------------------------------------
-export const getPropertyBySlugAdmin: RouteHandler<{
-  Params: { slug: string };
-}> = async (req, reply) => {
+export const getPropertyBySlugAdmin: RouteHandler<{ Params: { slug: string } }> = async (req, reply) => {
   try {
     const row = await getPropertyBySlugAdminRepo(req.params.slug);
     if (!row) return reply.code(404).send({ error: { message: "not_found" } });
     return reply.send(row);
   } catch (err) {
     req.log.error({ err }, "properties_admin_get_by_slug_failed");
-    return reply.code(500).send({
-      error: { message: "properties_admin_get_by_slug_failed" },
-    });
+    return reply.code(500).send({ error: { message: "properties_admin_get_by_slug_failed" } });
   }
 };
 
 // -------------------------------------------------------------
-// CREATE (admin) - ✅ assets + cover sync + storage validation
+// CREATE (admin) - ✅ assets + cover sync + multi enums
 // -------------------------------------------------------------
-export const createPropertyAdmin: RouteHandler<{
-  Body: UpsertPropertyBody;
-}> = async (req, reply) => {
+export const createPropertyAdmin: RouteHandler<{ Body: UpsertPropertyBody }> = async (req, reply) => {
   const parsed = upsertPropertyBodySchema.safeParse(req.body ?? {});
   if (!parsed.success) {
-    return reply
-      .code(400)
-      .send({ error: { message: "invalid_body", issues: parsed.error.issues } });
+    return reply.code(400).send({ error: { message: "invalid_body", issues: parsed.error.issues } });
   }
   const b = parsed.data;
 
@@ -207,45 +207,40 @@ export const createPropertyAdmin: RouteHandler<{
       address: b.address.trim(),
       district: b.district.trim(),
       city: b.city.trim(),
-      neighborhood:
-        typeof b.neighborhood === "string" ? b.neighborhood.trim() : null,
+      neighborhood: typeof b.neighborhood === "string" ? b.neighborhood.trim() : null,
 
       lat: dec6(b.coordinates.lat),
       lng: dec6(b.coordinates.lng),
 
-      description:
-        typeof b.description === "string"
-          ? b.description.trim()
-          : b.description ?? null,
+      description: typeof b.description === "string" ? b.description.trim() : b.description ?? null,
 
       price: typeof b.price === "number" ? dec2(b.price) : null,
       currency: (b.currency ?? "TRY").trim(),
-      min_price_admin:
-        typeof b.min_price_admin === "number" ? dec2(b.min_price_admin) : null,
+      min_price_admin: typeof b.min_price_admin === "number" ? dec2(b.min_price_admin) : null,
 
       listing_no: typeof b.listing_no === "string" ? b.listing_no.trim() : null,
-      badge_text:
-        typeof b.badge_text === "string" ? b.badge_text.trim() : null,
+      badge_text: typeof b.badge_text === "string" ? b.badge_text.trim() : null,
       featured: toBool(b.featured) ? 1 : 0,
 
       gross_m2: typeof b.gross_m2 === "number" ? b.gross_m2 : null,
       net_m2: typeof b.net_m2 === "number" ? b.net_m2 : null,
 
       rooms: typeof b.rooms === "string" ? b.rooms.trim() : null,
-      bedrooms:
-        typeof b.bedrooms === "number" ? Math.trunc(b.bedrooms) : null,
+      bedrooms: typeof b.bedrooms === "number" ? Math.trunc(b.bedrooms) : null,
 
-      building_age:
-        typeof b.building_age === "string" ? b.building_age.trim() : null,
+      building_age: typeof b.building_age === "string" ? b.building_age.trim() : null,
 
       floor: typeof b.floor === "string" ? b.floor.trim() : null,
       floor_no: typeof b.floor_no === "number" ? Math.trunc(b.floor_no) : null,
-      total_floors:
-        typeof b.total_floors === "number" ? Math.trunc(b.total_floors) : null,
+      total_floors: typeof b.total_floors === "number" ? Math.trunc(b.total_floors) : null,
 
       heating: typeof b.heating === "string" ? b.heating.trim() : null,
-      usage_status:
-        typeof b.usage_status === "string" ? b.usage_status.trim() : null,
+      usage_status: typeof b.usage_status === "string" ? b.usage_status.trim() : null,
+
+      // ✅ NEW: multi-select JSON alanlar
+      rooms_multi: cleanStringArrayOrNull((b as any).rooms_multi) ?? null,
+      heating_multi: cleanStringArrayOrNull((b as any).heating_multi) ?? null,
+      usage_status_multi: cleanStringArrayOrNull((b as any).usage_status_multi) ?? null,
 
       furnished: toBool(b.furnished) ? 1 : 0,
       in_site: toBool(b.in_site) ? 1 : 0,
@@ -260,33 +255,29 @@ export const createPropertyAdmin: RouteHandler<{
       has_video: toBool(b.has_video) ? 1 : 0,
       has_clip: toBool(b.has_clip) ? 1 : 0,
       has_virtual_tour: toBool(b.has_virtual_tour) ? 1 : 0,
-      has_map:
-        typeof b.has_map !== "undefined" ? (toBool(b.has_map) ? 1 : 0) : 1,
+      has_map: typeof b.has_map !== "undefined" ? (toBool(b.has_map) ? 1 : 0) : 1,
       accessible: toBool(b.accessible) ? 1 : 0,
 
-      // legacy cover: assets gelirse sync override edebilir
+      // legacy cover (assets gelirse replacePropertyAssets cover’u sync eder)
       image_url: typeof b.image_url === "string" ? b.image_url.trim() : null,
-      image_asset_id:
-        typeof b.image_asset_id === "string" ? b.image_asset_id.trim() : null,
+      image_asset_id: typeof b.image_asset_id === "string" ? b.image_asset_id.trim() : null,
       alt: typeof b.alt === "string" ? b.alt.trim() : null,
 
       is_active: toBool(b.is_active) ? 1 : 0,
-      display_order:
-        typeof b.display_order === "number" ? Math.trunc(b.display_order) : 0,
+      display_order: typeof b.display_order === "number" ? Math.trunc(b.display_order) : 0,
 
       created_at: new Date(),
       updated_at: new Date(),
-    });
+    } as any);
 
     if (!created) {
-      return reply
-        .code(500)
-        .send({ error: { message: "properties_admin_create_failed" } });
+      return reply.code(500).send({ error: { message: "properties_admin_create_failed" } });
     }
 
     // ✅ gallery replace + cover sync (assets is optional)
     if (Array.isArray(b.assets)) {
       await replacePropertyAssets(created.id, b.assets);
+      // replacePropertyAssets cover sync yapıyor; bunu koruyorum (mevcut davranış bozulmasın)
       await syncPropertyCoverFromAssets(created.id);
     }
 
@@ -302,15 +293,16 @@ export const createPropertyAdmin: RouteHandler<{
         error: { message: "invalid_asset_ids", details: "assets[].asset_id not found in storage_assets" },
       });
     }
+    if (e?.message === "asset_id_or_url_required") {
+      return reply.code(400).send({ error: { message: "asset_id_or_url_required" } });
+    }
     req.log.error({ err }, "properties_admin_create_failed");
-    return reply
-      .code(500)
-      .send({ error: { message: "properties_admin_create_failed" } });
+    return reply.code(500).send({ error: { message: "properties_admin_create_failed" } });
   }
 };
 
 // -------------------------------------------------------------
-// UPDATE (admin, partial) - ✅ assets replace + cover sync + validation
+// UPDATE (admin, partial) - ✅ assets replace + cover sync + multi enums
 // -------------------------------------------------------------
 export const updatePropertyAdmin: RouteHandler<{
   Params: { id: string };
@@ -318,9 +310,7 @@ export const updatePropertyAdmin: RouteHandler<{
 }> = async (req, reply) => {
   const parsed = patchPropertyBodySchema.safeParse(req.body ?? {});
   if (!parsed.success) {
-    return reply
-      .code(400)
-      .send({ error: { message: "invalid_body", issues: parsed.error.issues } });
+    return reply.code(400).send({ error: { message: "invalid_body", issues: parsed.error.issues } });
   }
   const b = parsed.data;
 
@@ -352,8 +342,7 @@ export const updatePropertyAdmin: RouteHandler<{
     if (typeof neighborhood !== "undefined") patch.neighborhood = neighborhood;
 
     if (typeof b.description !== "undefined") {
-      patch.description =
-        typeof b.description === "string" ? b.description.trim() : b.description ?? null;
+      patch.description = typeof b.description === "string" ? b.description.trim() : b.description ?? null;
     }
 
     // ✅ coordinates partial
@@ -363,8 +352,9 @@ export const updatePropertyAdmin: RouteHandler<{
     // price
     if (typeof b.price !== "undefined") patch.price = b.price === null ? null : dec2(b.price);
     if (typeof b.currency !== "undefined") patch.currency = (b.currency ?? "TRY").trim();
-    if (typeof b.min_price_admin !== "undefined")
+    if (typeof b.min_price_admin !== "undefined") {
       patch.min_price_admin = b.min_price_admin === null ? null : dec2(b.min_price_admin);
+    }
 
     // meta
     if (typeof b.listing_no !== "undefined") patch.listing_no = b.listing_no ?? null;
@@ -377,8 +367,7 @@ export const updatePropertyAdmin: RouteHandler<{
 
     // core filters
     if (typeof b.rooms !== "undefined") patch.rooms = b.rooms ?? null;
-    if (typeof b.bedrooms !== "undefined")
-      patch.bedrooms = b.bedrooms === null ? null : Math.trunc(b.bedrooms);
+    if (typeof b.bedrooms !== "undefined") patch.bedrooms = b.bedrooms === null ? null : Math.trunc(b.bedrooms);
 
     if (typeof b.building_age !== "undefined") patch.building_age = b.building_age ?? null;
 
@@ -390,6 +379,11 @@ export const updatePropertyAdmin: RouteHandler<{
 
     if (typeof b.heating !== "undefined") patch.heating = b.heating ?? null;
     if (typeof b.usage_status !== "undefined") patch.usage_status = b.usage_status ?? null;
+
+    // ✅ NEW: multi-select JSON alanlar (patch)
+    if (typeof (b as any).rooms_multi !== "undefined") patch.rooms_multi = cleanStringArrayOrNull((b as any).rooms_multi);
+    if (typeof (b as any).heating_multi !== "undefined") patch.heating_multi = cleanStringArrayOrNull((b as any).heating_multi);
+    if (typeof (b as any).usage_status_multi !== "undefined") patch.usage_status_multi = cleanStringArrayOrNull((b as any).usage_status_multi);
 
     // bools
     if (typeof b.furnished !== "undefined") patch.furnished = toBool(b.furnished) ? 1 : 0;
@@ -408,14 +402,15 @@ export const updatePropertyAdmin: RouteHandler<{
     if (typeof b.has_map !== "undefined") patch.has_map = toBool(b.has_map) ? 1 : 0;
     if (typeof b.accessible !== "undefined") patch.accessible = toBool(b.accessible) ? 1 : 0;
 
-    // legacy cover direct patch (assets gelirse sonra sync override eder)
+    // legacy cover direct patch (assets gelirse replacePropertyAssets cover’u sync eder)
     if (typeof b.image_url !== "undefined") patch.image_url = b.image_url ?? null;
     if (typeof b.image_asset_id !== "undefined") patch.image_asset_id = b.image_asset_id ?? null;
     if (typeof b.alt !== "undefined") patch.alt = b.alt ?? null;
 
     if (typeof b.is_active !== "undefined") patch.is_active = toBool(b.is_active) ? 1 : 0;
-    if (typeof b.display_order !== "undefined")
+    if (typeof b.display_order !== "undefined") {
       patch.display_order = typeof b.display_order === "number" ? Math.trunc(b.display_order) : 0;
+    }
 
     const updated = await updatePropertyRepo(req.params.id, patch);
     if (!updated) return reply.code(404).send({ error: { message: "not_found" } });
@@ -423,6 +418,7 @@ export const updatePropertyAdmin: RouteHandler<{
     // ✅ assets replace is explicit: even empty array clears gallery & cover
     if (Array.isArray(b.assets)) {
       await replacePropertyAssets(req.params.id, b.assets);
+      // replacePropertyAssets cover sync yapıyor; bunu koruyorum (mevcut davranış bozulmasın)
       await syncPropertyCoverFromAssets(req.params.id);
     }
 
@@ -438,20 +434,18 @@ export const updatePropertyAdmin: RouteHandler<{
         error: { message: "invalid_asset_ids", details: "assets[].asset_id not found in storage_assets" },
       });
     }
+    if (e?.message === "asset_id_or_url_required") {
+      return reply.code(400).send({ error: { message: "asset_id_or_url_required" } });
+    }
     req.log.error({ err }, "properties_admin_update_failed");
-    return reply
-      .code(500)
-      .send({ error: { message: "properties_admin_update_failed" } });
+    return reply.code(500).send({ error: { message: "properties_admin_update_failed" } });
   }
 };
 
 // -------------------------------------------------------------
 // DELETE (admin) - ✅ property_assets + related storage cleanup
 // -------------------------------------------------------------
-export const removePropertyAdmin: RouteHandler<{ Params: { id: string } }> = async (
-  req,
-  reply,
-) => {
+export const removePropertyAdmin: RouteHandler<{ Params: { id: string } }> = async (req, reply) => {
   try {
     const affected = await deletePropertyRepo(req.params.id);
     if (!affected) return reply.code(404).send({ error: { message: "not_found" } });

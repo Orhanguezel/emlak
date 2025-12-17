@@ -1,5 +1,6 @@
 // =============================================================
 // FILE: src/modules/properties/repository.ts
+// FINAL: multi-select enum alanlar + tmp_* gallery fix + JSON filters
 // =============================================================
 import { randomUUID } from "node:crypto";
 import { db } from "@/db/client";
@@ -26,7 +27,6 @@ import {
   like,
   or,
   sql,
-  inArray,
   type SQL,
 } from "drizzle-orm";
 
@@ -67,7 +67,11 @@ export type ListParams = {
   net_m2_min?: number;
   net_m2_max?: number;
 
+  // legacy tekli
   rooms?: string;
+  // ✅ multi-select (enum string[])
+  rooms_multi?: string[] | string;
+
   bedrooms_min?: number;
   bedrooms_max?: number;
 
@@ -79,8 +83,15 @@ export type ListParams = {
   total_floors_min?: number;
   total_floors_max?: number;
 
+  // legacy tekli
   heating?: string;
+  // ✅ multi-select
+  heating_multi?: string[] | string;
+
+  // legacy tekli
   usage_status?: string;
+  // ✅ multi-select
+  usage_status_multi?: string[] | string;
 
   furnished?: BoolLike;
   in_site?: BoolLike;
@@ -138,6 +149,46 @@ const parseOrder = (
 
 const isNonEmpty = (s?: string | null) => typeof s === "string" && s.trim().length > 0;
 
+function isUuid36(x: unknown): x is string {
+  return typeof x === "string" && x.length === 36;
+}
+
+// query: string | string[] | "a,b,c"
+function toArray(v: unknown): string[] | undefined {
+  if (v == null) return undefined;
+  if (Array.isArray(v)) {
+    const out = v.map((x) => String(x).trim()).filter(Boolean);
+    return out.length ? out : undefined;
+  }
+  if (typeof v === "string") {
+    const s = v.trim();
+    if (!s) return undefined;
+    if (s.includes(",")) {
+      const out = s.split(",").map((x) => x.trim()).filter(Boolean);
+      return out.length ? out : undefined;
+    }
+    return [s];
+  }
+  return undefined;
+}
+
+/**
+ * MySQL JSON array contains helper:
+ * JSON_CONTAINS(col, JSON_QUOTE('kombi'), '$')
+ * Drizzle: sql`JSON_CONTAINS(${col}, ${JSON.stringify(value)}, '$')`
+ */
+function jsonContains(col: any, value: string): SQL {
+  return sql`JSON_CONTAINS(${col}, ${JSON.stringify(value)}, '$')`;
+}
+
+/** (multi) filter: any-of values */
+function jsonContainsAny(col: any, values: string[]): SQL | undefined {
+  const vs = values.map((x) => String(x).trim()).filter(Boolean);
+  if (!vs.length) return undefined;
+  const parts = vs.map((v) => jsonContains(col, v));
+  return (or(...(parts as any)) as unknown) as SQL;
+}
+
 function buildWhere(params: ListParams): SQL | undefined {
   const filters: SQL[] = [];
 
@@ -166,7 +217,16 @@ function buildWhere(params: ListParams): SQL | undefined {
   if (typeof params.net_m2_min === "number") filters.push(gte(properties.net_m2, params.net_m2_min));
   if (typeof params.net_m2_max === "number") filters.push(lte(properties.net_m2, params.net_m2_max));
 
+  // legacy tekli
   if (isNonEmpty(params.rooms)) filters.push(eq(properties.rooms, params.rooms!.trim()));
+
+  // ✅ multi rooms filter (JSON)
+  const roomsMulti = toArray(params.rooms_multi);
+  if (roomsMulti?.length) {
+    const expr = jsonContainsAny(properties.rooms_multi, roomsMulti);
+    if (expr) filters.push(expr);
+  }
+
   if (typeof params.bedrooms_min === "number") filters.push(gte(properties.bedrooms, params.bedrooms_min));
   if (typeof params.bedrooms_max === "number") filters.push(lte(properties.bedrooms, params.bedrooms_max));
 
@@ -178,8 +238,23 @@ function buildWhere(params: ListParams): SQL | undefined {
   if (typeof params.total_floors_min === "number") filters.push(gte(properties.total_floors, params.total_floors_min));
   if (typeof params.total_floors_max === "number") filters.push(lte(properties.total_floors, params.total_floors_max));
 
+  // legacy tekli
   if (isNonEmpty(params.heating)) filters.push(eq(properties.heating, params.heating!.trim()));
+  // ✅ multi heating filter (JSON)
+  const heatingMulti = toArray(params.heating_multi);
+  if (heatingMulti?.length) {
+    const expr = jsonContainsAny(properties.heating_multi, heatingMulti);
+    if (expr) filters.push(expr);
+  }
+
+  // legacy tekli
   if (isNonEmpty(params.usage_status)) filters.push(eq(properties.usage_status, params.usage_status!.trim()));
+  // ✅ multi usage filter (JSON)
+  const usageMulti = toArray(params.usage_status_multi);
+  if (usageMulti?.length) {
+    const expr = jsonContainsAny(properties.usage_status_multi, usageMulti);
+    if (expr) filters.push(expr);
+  }
 
   const boolPairs: Array<[keyof ListParams, any]> = [
     ["furnished", properties.furnished],
@@ -230,11 +305,11 @@ function buildWhere(params: ListParams): SQL | undefined {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                               ASSETS HELPERS                                */
+/*                               ASSETS HELPERS                               */
 /* -------------------------------------------------------------------------- */
 
 export type ReplaceAssetInput = {
-  id?: string;
+  id?: string; // tmp_* olabilir
   asset_id?: string | null;
   url?: string | null;
   alt?: string | null;
@@ -248,10 +323,6 @@ const toCover01 = (v: ReplaceAssetInput["is_cover"]): 0 | 1 => {
   if (v === true || v === 1 || v === "1" || v === "true") return 1;
   return 0;
 };
-
-function isUuid36(x: unknown): x is string {
-  return typeof x === "string" && x.length === 36;
-}
 
 async function assertStorageAssetIdsExist(assetIds: string[]) {
   if (!assetIds.length) return;
@@ -302,32 +373,54 @@ export async function listPropertyAssetsAdmin(propertyId: string): Promise<Prope
   });
 }
 
-/** Galeriyi komple değiştir (transaction içinde delete+insert) + ✅ storage existence check */
+/**
+ * ✅ Galeriyi komple değiştir (transaction içinde delete+insert)
+ * - tmp_* id kabul edilir (DB UUID üretir)
+ * - cover teklenir (son true kazansın; yoksa 0)
+ * - storage existence check
+ * - ardından properties.cover alanları sync edilir
+ */
 export async function replacePropertyAssets(propertyId: string, assets: ReplaceAssetInput[]) {
   const assetIdsToCheck = assets
     .map((a) => (a.asset_id ? String(a.asset_id) : null))
     .filter((x): x is string => isUuid36(x));
 
-  // ✅ hard validate: asset_id listed must exist in storage_assets
   await assertStorageAssetIdsExist(assetIdsToCheck);
 
   await db.transaction(async (tx) => {
     await tx.delete(property_assets).where(eq(property_assets.property_id, propertyId));
-    if (!assets.length) return;
+    if (!assets.length) {
+      // cover'ı da temizle
+      await tx
+        .update(properties)
+        .set({
+          image_asset_id: null,
+          image_url: null,
+          alt: null,
+          updated_at: new Date(),
+        } as any)
+        .where(eq(properties.id, propertyId));
+      return;
+    }
 
-    // cover normalize: first is_cover true; else first item
-    let coverIndex = assets.findIndex((a) => toCover01(a.is_cover) === 1);
-    if (coverIndex < 0) coverIndex = 0;
+    // ✅ cover normalize: "son true" kazansın; yoksa 0
+    const lastCoverReverseIdx = [...assets].reverse().findIndex((a) => toCover01(a.is_cover) === 1);
+    const coverIndex = lastCoverReverseIdx >= 0 ? assets.length - 1 - lastCoverReverseIdx : 0;
 
     const now = new Date();
 
     const inserts: NewPropertyAssetRow[] = assets.map((a, i) => {
+      // ✅ tmp_* veya boş => DB UUID
       const id = isUuid36(a.id) ? String(a.id) : randomUUID();
 
       const asset_id = a.asset_id ? String(a.asset_id) : null;
       const url = a.url ? String(a.url) : null;
 
-      // safety: at least one must exist (validation should already enforce)
+      // safety: en az biri dolu olmalı (validation zaten yapıyor, ama yine de)
+      if (!asset_id && !(url && url.trim().length)) {
+        throw new Error("asset_id_or_url_required");
+      }
+
       return {
         id,
         property_id: propertyId,
@@ -344,10 +437,28 @@ export async function replacePropertyAssets(propertyId: string, assets: ReplaceA
     });
 
     await tx.insert(property_assets).values(inserts as any);
+
+    // ✅ cover sync (cover row’dan properties.image_* derive)
+    const cover = inserts[coverIndex];
+
+    const patch: Partial<NewPropertyRow> = {
+      alt: cover?.alt ?? null,
+      updated_at: new Date(),
+    };
+
+    if (cover?.asset_id) {
+      patch.image_asset_id = cover.asset_id;
+      patch.image_url = null;
+    } else {
+      patch.image_asset_id = null;
+      patch.image_url = cover?.url ?? null;
+    }
+
+    await tx.update(properties).set(patch as any).where(eq(properties.id, propertyId));
   });
 }
 
-/** Cover alanlarını galeriden derive et */
+/** Cover alanlarını galeriden derive et (manuel çağrı için bırakıyorum) */
 export async function syncPropertyCoverFromAssets(propertyId: string) {
   const rows = await db
     .select()
@@ -366,7 +477,7 @@ export async function syncPropertyCoverFromAssets(propertyId: string) {
         image_url: null,
         alt: null,
         updated_at: new Date(),
-      })
+      } as any)
       .where(eq(properties.id, propertyId));
     return;
   }
@@ -376,7 +487,6 @@ export async function syncPropertyCoverFromAssets(propertyId: string) {
     updated_at: new Date(),
   };
 
-  // ✅ prefer storage asset_id for cover
   if (cover.asset_id) {
     patch.image_asset_id = cover.asset_id;
     patch.image_url = null;
@@ -395,14 +505,12 @@ export async function syncPropertyCoverFromAssets(propertyId: string) {
 async function enrichCoverUrlIfNeeded(view: any) {
   const cfg = await getCloudinaryConfig();
 
-  // storage cover
   if (view?.image_asset_id) {
     const storage = await getStorageByIds([String(view.image_asset_id)]);
     const s = storage[0];
     if (s) {
       view.image_url = buildPublicUrl(s.bucket, s.path, s.url, cfg ?? undefined);
     } else {
-      // invalid reference: keep as-is (or null out; tercih senin)
       view.image_url = view.image_url ?? null;
     }
   }
@@ -433,7 +541,6 @@ async function cleanupStorageAssetsByIds(assetIds: string[]) {
     }
   }
 
-  // DB cleanup
   await deleteStorageManyByIds(ids);
 }
 
@@ -489,7 +596,6 @@ export async function listPropertiesAdmin(params: ListParams) {
   return { items, total };
 }
 
-
 /** get by id (ADMIN) + assets[] + cover resolved */
 export async function getPropertyByIdAdmin(id: string) {
   const rows = await db.select().from(properties).where(eq(properties.id, id)).limit(1);
@@ -516,19 +622,19 @@ export async function getPropertyBySlugAdmin(slug: string) {
 
 /** create (ADMIN) */
 export async function createProperty(values: NewPropertyRow) {
-  await db.insert(properties).values(values);
+  // ✅ Multi alanlar schema’da var; values içinde gelebilir
+  await db.insert(properties).values(values as any);
   return getPropertyByIdAdmin(values.id);
 }
 
 /** update (ADMIN, partial) */
 export async function updateProperty(id: string, patch: Partial<NewPropertyRow>) {
-  await db.update(properties).set({ ...patch, updated_at: new Date() }).where(eq(properties.id, id));
+  await db.update(properties).set({ ...patch, updated_at: new Date() } as any).where(eq(properties.id, id));
   return getPropertyByIdAdmin(id);
 }
 
 /** delete (hard, ADMIN) - ✅ deletes property_assets + related storage files/rows */
 export async function deleteProperty(id: string) {
-  // collect related storage asset_ids (gallery + cover)
   const [galleryRows, propRows] = await Promise.all([
     db
       .select({ asset_id: property_assets.asset_id })
@@ -549,17 +655,14 @@ export async function deleteProperty(id: string) {
   const coverId = propRows[0]?.image_asset_id;
   if (isUuid36(coverId)) assetIds.push(String(coverId));
 
-  // delete gallery rows
   await db.delete(property_assets).where(eq(property_assets.property_id, id));
 
-  // delete property
   const res = await db.delete(properties).where(eq(properties.id, id)).execute();
   const affected =
     typeof (res as unknown as { affectedRows?: number }).affectedRows === "number"
       ? (res as unknown as { affectedRows: number }).affectedRows
       : 0;
 
-  // cleanup storage (only if property delete succeeded)
   if (affected > 0) {
     await cleanupStorageAssetsByIds(assetIds);
   }
@@ -618,7 +721,6 @@ export async function listStatuses(): Promise<string[]> {
   return rows.map((r) => r.s);
 }
 
-
 /* -------------------------------------------------------------------------- */
 /*                           PUBLIC ASSETS HELPERS                             */
 /* -------------------------------------------------------------------------- */
@@ -662,8 +764,6 @@ async function listPropertyAssetsPublic(propertyId: string): Promise<PropertyAss
         : (r.url ?? "");
 
       const url = String(resolvedUrl || "").trim();
-
-      // public için url zorunlu; boşsa ignore
       if (!url) return null;
 
       return {
@@ -689,7 +789,6 @@ function attachPublicGallery(base: any, assets: PropertyAssetPublicView[]) {
     .filter((a) => (a.kind || "").toString().toLowerCase() === "image")
     .map((a) => a.url);
 
-  // fallback: base.image_url varsa images içine koy
   const cover = typeof base?.image_url === "string" ? base.image_url.trim() : "";
   const imagesFinal = images.length ? images : (cover ? [cover] : []);
 
@@ -702,15 +801,11 @@ function attachPublicGallery(base: any, assets: PropertyAssetPublicView[]) {
 }
 
 function stripPublicSensitiveFields(view: any) {
-  // Public response’ta asla dönmesini istemediğin admin alanlarını burada sıfırla.
-  // (Şemanı görmediğim için “varsa” diye güvenli şekilde yapıyorum.)
   const v = { ...view };
-
   if ("min_price_admin" in v) v.min_price_admin = null;
   if ("admin_note" in v) v.admin_note = null;
   if ("note_admin" in v) v.note_admin = null;
   if ("internal_note" in v) v.internal_note = null;
-
   return v;
 }
 
@@ -723,15 +818,10 @@ export async function getPropertyByIdPublic(id: string) {
   if (!rows[0]) return null;
 
   let base: any = rowToPublicView(rows[0] as PropertyRow);
-
-  // cover storage ise resolve et
   base = await enrichCoverUrlIfNeeded(base);
 
-  // gallery
   const assets = await listPropertyAssetsPublic(String(base.id));
   base = attachPublicGallery(base, assets);
-
-  // admin alanlarını temizle
   base = stripPublicSensitiveFields(base);
 
   return base as (PropertyPublicView & { assets: PropertyAssetPublicView[]; images: string[]; image: string | null });
@@ -742,17 +832,11 @@ export async function getPropertyBySlugPublic(slug: string) {
   if (!rows[0]) return null;
 
   let base: any = rowToPublicView(rows[0] as PropertyRow);
-
-  // cover storage ise resolve et
   base = await enrichCoverUrlIfNeeded(base);
 
-  // gallery
   const assets = await listPropertyAssetsPublic(String(base.id));
   base = attachPublicGallery(base, assets);
-
-  // admin alanlarını temizle
   base = stripPublicSensitiveFields(base);
 
   return base as (PropertyPublicView & { assets: PropertyAssetPublicView[]; images: string[]; image: string | null });
 }
-
