@@ -55,7 +55,7 @@ export function SiteSettingsSmtpTab({ form }: Props) {
       {renderTextInput(
         "smtp_username",
         "SMTP Kullanıcı Adı",
-        "info@mezarisim.com",
+        "info@xemlak.com",
       )}
 
       {/* Şifre: password tipi */}
@@ -76,12 +76,12 @@ export function SiteSettingsSmtpTab({ form }: Props) {
       {renderTextInput(
         "smtp_from_email",
         "Gönderen E-posta (From)",
-        "info@mezarisim.com",
+        "info@xemlak.com",
       )}
       {renderTextInput(
         "smtp_from_name",
         "Gönderen İsim",
-        "Mezarisim.com",
+        "Xemlak.com",
       )}
 
       <div className="md:col-span-2 flex items-center gap-3">

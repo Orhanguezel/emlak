@@ -1,4 +1,4 @@
-# Mezarisim.com - Robots.txt
+# Xemlak.com - Robots.txt
 # İstanbul'un En Güvenilir Mezar Taşı Üreticisi
 
 # Allow all major search engines
@@ -129,10 +129,10 @@ Allow: /#quality
 Allow: /#faq
 
 # Sitemap reference
-Sitemap: https://mezarisim.com/sitemap.xml
+Sitemap: https://xemlak.com/sitemap.xml
 
 # Crawl delay for courtesy (seconds)
 Crawl-delay: 1
 
 # Host directive (optional)
-Host: mezarisim.com
+Host: xemlak.com

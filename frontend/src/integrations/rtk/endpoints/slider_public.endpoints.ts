@@ -1,3 +1,5 @@
+// src/integrations/rtk/endpoints/slider_public.endpoints.ts
+
 import { baseApi } from "../baseApi";
 import type { FetchArgs } from "@reduxjs/toolkit/query";
 import type { SliderPublic, SliderListParams } from "@/integrations/rtk/types/slider";

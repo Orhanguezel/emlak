@@ -68,12 +68,12 @@ export function SiteSettingsContactTab({ form }: Props) {
       {renderTextInput(
         "contact_email",
         "E-posta",
-        "mezarisim.com@gmail.com",
+        "xemlak.com@gmail.com",
       )}
       {renderTextInput(
         "contact_to_email",
         "İletişim Formu Hedef E-posta",
-        "mezarisim.com@gmail.com",
+        "xemlak.com@gmail.com",
       )}
       {renderTextInput(
         "contact_whatsapp_link",

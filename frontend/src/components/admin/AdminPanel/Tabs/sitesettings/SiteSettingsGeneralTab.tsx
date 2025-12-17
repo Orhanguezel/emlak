@@ -55,7 +55,7 @@ export function SiteSettingsGeneralTab({ form }: Props) {
 
   return (
     <div className="grid gap-4 md:grid-cols-2">
-      {renderTextInput("brand_name", "Marka Adı", "mezarisim.com")}
+      {renderTextInput("brand_name", "Marka Adı", "xemlak.com")}
       {renderTextInput(
         "brand_tagline",
         "Kısa Slogan",

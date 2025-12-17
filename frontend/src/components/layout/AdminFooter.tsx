@@ -13,7 +13,7 @@ export default function AdminFooter() {
     <footer data-admin-footer className="w-full border-t border-gray-200 bg-white">
       <div className="mx-auto max-w-screen-lg px-4 py-6">
         <div className="flex items-center justify-center gap-3 text-xs text-gray-500">
-          <span>© {year} mezarisim.com — Admin</span>
+          <span>© {year} X emlak.com — Admin</span>
           <span className="opacity-40">•</span>
           <span>v1.0.0</span>
           <button

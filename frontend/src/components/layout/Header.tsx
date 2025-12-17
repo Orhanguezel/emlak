@@ -74,7 +74,6 @@ export function Header({ currentPage: _currentPage, onNavigate, onSearch, search
       { title: "ANASAYFA", path: "/", pageKey: "home", type: "link" },
       { title: "EMLAKLAR", path: "/emlaklar", pageKey: "properties", type: "link" },
       { title: "KURUMSAL", path: "#", pageKey: "kurumsal", type: "dropdown", itemsKey: "menu_kurumsal" },
-      { title: "HİZMETLER", path: "#", pageKey: "services", type: "dropdown", itemsKey: "menu_other_services" },
       { title: "İLETİŞİM", path: "/iletisim", pageKey: "contact", type: "link" },
     ];
     return safeParseJson<HeaderMenuItem[]>(get("header_menu", fallback), fallback);

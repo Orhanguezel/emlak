@@ -1,15 +1,17 @@
 // =============================================================
-// FILE: src/components/admin/AdminSecretAccess.tsx
+// FILE: src/components/admin/AdminSecretAccess.tsx   (X Emlak)
+// Theme: slate / bg-slate-950
 // =============================================================
 "use client";
 
-import { useState, useEffect, FormEvent } from "react";
+import { useState, useEffect, FormEvent, useMemo } from "react";
+import { toast } from "sonner";
+import { Shield, Eye, EyeOff, Lock } from "lucide-react";
+
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
-import { Shield, Eye, EyeOff, Lock } from "lucide-react";
-import { toast } from "sonner";
 
 import {
   useAuthStatusQuery,
@@ -23,6 +25,48 @@ interface AdminSecretAccessProps {
   onNavigate: (page: string) => void;
 }
 
+function safeJson<T>(v: any, fallback: T): T {
+  if (v == null) return fallback;
+  if (typeof v === "object") return v as T;
+  if (typeof v !== "string") return fallback;
+
+  const s = v.trim();
+  if (!s) return fallback;
+
+  try {
+    return JSON.parse(s) as T;
+  } catch {
+    try {
+      const unquoted = JSON.parse(s);
+      if (typeof unquoted === "string") {
+        try {
+          return JSON.parse(unquoted) as T;
+        } catch {
+          return unquoted as unknown as T;
+        }
+      }
+      return unquoted as unknown as T;
+    } catch {
+      return fallback;
+    }
+  }
+}
+
+function sanitizePhoneDigits(s: string): string {
+  return (s || "").replace(/[^\d+]/g, "").replace(/\s+/g, "");
+}
+
+function buildTelHref(raw: string): string {
+  const trimmed = (raw || "").trim();
+  if (!trimmed) return "tel:+49000000000";
+  if (trimmed.startsWith("tel:")) return trimmed;
+
+  const cleaned = sanitizePhoneDigits(trimmed);
+  if (!cleaned) return "tel:+49000000000";
+  if (cleaned.startsWith("+")) return `tel:${cleaned}`;
+  return `tel:+${cleaned}`;
+}
+
 export function AdminSecretAccess({ onNavigate }: AdminSecretAccessProps) {
   const { data: status, isFetching, refetch } = useAuthStatusQuery();
   const [login, { isLoading }] = useAuthTokenMutation();
@@ -31,25 +75,26 @@ export function AdminSecretAccess({ onNavigate }: AdminSecretAccessProps) {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  // 🔹 Telefon ayarlarını site_settings üzerinden çek
-  const { data: phoneDisplaySetting } =
-    useGetSiteSettingByKeyQuery("contact_phone_display");
-  const { data: phoneTelSetting } =
-    useGetSiteSettingByKeyQuery("contact_phone_tel");
+  // site_settings -> value çoğunlukla JSON string (örn: '"...") geliyor
+  const { data: phoneDisplaySetting } = useGetSiteSettingByKeyQuery("contact_phone_display");
+  const { data: phoneTelSetting } = useGetSiteSettingByKeyQuery("contact_phone_tel");
 
-  const contactPhoneDisplay =
-    typeof phoneDisplaySetting?.value === "string"
-      ? phoneDisplaySetting.value
-      : "0533 483 89 71";
+  const contactPhoneDisplay = useMemo(() => {
+    const v = phoneDisplaySetting?.value;
+    return safeJson<string>(v, "+49 000 000000");
+  }, [phoneDisplaySetting]);
 
-  const contactPhoneTel =
-    typeof phoneTelSetting?.value === "string"
-      ? phoneTelSetting.value
-      : "05334838971";
+  const contactPhoneRaw = useMemo(() => {
+    const v = phoneTelSetting?.value;
+    // tel için daha “düz” numara; yoksa display kullan
+    return safeJson<string>(v, contactPhoneDisplay);
+  }, [phoneTelSetting, contactPhoneDisplay]);
 
-  // 🔹 Zaten auth ise direkt admin paneline yönlendir
+  const telHref = useMemo(() => buildTelHref(contactPhoneRaw), [contactPhoneRaw]);
+
+  // auth ise admin'e yönlendir
   useEffect(() => {
-    if (status?.authenticated && status.is_admin) {
+    if (status?.authenticated && status?.is_admin) {
       toast.success("Admin doğrulandı, yönlendiriliyor…");
       onNavigate("admin");
     }
@@ -57,16 +102,16 @@ export function AdminSecretAccess({ onNavigate }: AdminSecretAccessProps) {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+
     if (!email.trim() || !password.trim()) {
       toast.error("E-posta ve şifre zorunludur.");
       return;
     }
 
     try {
-      // 🔹 BE'nin beklediği grant_type: "password" alanını gönderiyoruz
       const resp = await login({
-        email,
-        password,
+        email: email.trim(),
+        password: password.trim(),
         grant_type: "password",
       }).unwrap();
 
@@ -75,10 +120,7 @@ export function AdminSecretAccess({ onNavigate }: AdminSecretAccessProps) {
         localStorage.setItem("mh_access_token", resp.access_token);
       }
 
-      // refresh token'ı gerekmedikçe kullanmıyoruz
       localStorage.removeItem("mh_refresh_token");
-
-      // 🔹 Status'u yeniden çek -> üstteki useEffect admin’e yönlendirir
       await refetch();
     } catch (err: any) {
       console.error("LOGIN ERROR >>>", err);
@@ -95,24 +137,27 @@ export function AdminSecretAccess({ onNavigate }: AdminSecretAccessProps) {
   const busy = isLoading || isFetching;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-lg">
         <CardHeader className="text-center space-y-2">
-          <div className="mx-auto w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center">
-            <Shield className="w-8 h-8 text-teal-600" />
+          <div className="mx-auto w-16 h-16 bg-slate-950 rounded-full flex items-center justify-center border border-white/10">
+            <Shield className="w-8 h-8 text-white" />
           </div>
-          <CardTitle className="text-2xl">Admin Giriş</CardTitle>
-          <p className="text-gray-600">Yetkili kullanıcılar için giriş ekranı</p>
+
+          <CardTitle className="text-2xl text-slate-950">Admin Giriş</CardTitle>
+          <p className="text-slate-600 text-sm">Yetkili kullanıcılar için giriş ekranı</p>
         </CardHeader>
 
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">E-posta</Label>
+              <Label htmlFor="email" className="text-slate-800">
+                E-posta
+              </Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="admin@mezarisim.com"
+                placeholder="admin@xemlak.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 autoComplete="username"
@@ -121,7 +166,10 @@ export function AdminSecretAccess({ onNavigate }: AdminSecretAccessProps) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Şifre</Label>
+              <Label htmlFor="password" className="text-slate-800">
+                Şifre
+              </Label>
+
               <div className="relative">
                 <Input
                   id="password"
@@ -133,36 +181,38 @@ export function AdminSecretAccess({ onNavigate }: AdminSecretAccessProps) {
                   autoComplete="current-password"
                   disabled={busy}
                 />
+
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="absolute right-0 top-0 h-full px-3"
+                  className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
                   onClick={() => setShowPassword((s) => !s)}
                   disabled={busy}
+                  aria-label={showPassword ? "Şifreyi gizle" : "Şifreyi göster"}
                 >
                   {showPassword ? (
-                    <EyeOff className="w-4 h-4 text-gray-400" />
+                    <EyeOff className="w-4 h-4 text-slate-500" />
                   ) : (
-                    <Eye className="w-4 h-4 text-gray-400" />
+                    <Eye className="w-4 h-4 text-slate-500" />
                   )}
                 </Button>
               </div>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-3 pt-1">
               <Button
                 type="submit"
-                className="w-full bg-teal-600 hover:bg-teal-700"
+                className="w-full bg-slate-950 hover:bg-slate-900 text-white rounded-xl"
                 disabled={busy}
               >
                 {busy ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white/70 border-t-transparent rounded-full animate-spin" />
                     Giriş Yapılıyor…
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-center gap-2">
                     <Lock className="w-4 h-4" />
                     Admin Paneline Giriş
                   </div>
@@ -172,7 +222,7 @@ export function AdminSecretAccess({ onNavigate }: AdminSecretAccessProps) {
               <Button
                 type="button"
                 variant="outline"
-                className="w-full"
+                className="w-full rounded-xl border-slate-300 text-slate-900 hover:bg-slate-50"
                 onClick={() => onNavigate("home")}
                 disabled={busy}
               >
@@ -181,30 +231,26 @@ export function AdminSecretAccess({ onNavigate }: AdminSecretAccessProps) {
             </div>
           </form>
 
-          <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+          {/* Security notice */}
+          <div className="mt-6 p-4 bg-slate-50 border border-slate-200 rounded-xl">
             <div className="flex gap-3">
               <div className="flex-shrink-0">
-                <Shield className="w-5 h-5 text-amber-600" />
+                <Shield className="w-5 h-5 text-slate-900" />
               </div>
               <div>
-                <h4 className="text-sm font-medium text-amber-800">
-                  Güvenlik Uyarısı
-                </h4>
-                <p className="text-sm text-amber-700 mt-1">
-                  Bu sayfa yalnızca yetkili personel içindir. Giriş bilgileriniz
-                  sunucuda doğrulanır.
+                <h4 className="text-sm font-semibold text-slate-900">Güvenlik Uyarısı</h4>
+                <p className="text-sm text-slate-700 mt-1">
+                  Bu sayfa yalnızca yetkili personel içindir. Giriş bilgileriniz sunucuda doğrulanır.
                 </p>
               </div>
             </div>
           </div>
 
+          {/* Contact */}
           <div className="mt-4 text-center">
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-slate-500">
               Şifremi unuttum? İletişim:
-              <a
-                href={`tel:${contactPhoneTel}`}
-                className="text-teal-600 hover:text-teal-700 ml-1"
-              >
+              <a href={telHref} className="text-slate-900 hover:underline ml-1 font-semibold">
                 {contactPhoneDisplay}
               </a>
             </p>

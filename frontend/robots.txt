@@ -122,10 +122,10 @@ Allow: /*?page=productDetail*
 Allow: /*product=*
 
 # Sitemap reference
-Sitemap: https://mezarisim.com/sitemap.xml
+Sitemap: https://xemlak.com/sitemap.xml
 
 # Crawl delay for courtesy (seconds)
 Crawl-delay: 1
 
 # Host directive (optional)
-Host: mezarisim.com
+Host: xemlak.com

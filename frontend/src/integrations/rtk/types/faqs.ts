@@ -1,6 +1,4 @@
-// src/integrations/metahub/db/types/faqs.ts
-
-
+// FILE: src/integrations/rtk/types/faqs.ts
 export interface Faq {
   id: string;
   question: string;

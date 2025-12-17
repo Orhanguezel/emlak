@@ -1,4 +1,4 @@
--- 044_faqs.sql
+-- 044_faqs_emlak.sql
 DROP TABLE IF EXISTS `faqs`;
 CREATE TABLE `faqs` (
   `id`            CHAR(36)     NOT NULL,
@@ -23,49 +23,49 @@ INSERT INTO `faqs`
 (`id`,`question`,`answer`,`slug`,`category`,`is_active`,`display_order`,`created_at`,`updated_at`)
 VALUES
 (UUID(),
- 'Mezar yapımında bize dair bir şüpheniz bulunmasın',
- '25 yılı aşkın tecrübemiz ve binlerce başarılı projemizle İstanbul''da mezar yapımı konusunda güvenilir bir firmayız. Kaliteli malzeme, profesyonel işçilik ve müşteri memnuniyeti garantisi ile hizmet veriyoruz. Tüm işlerimizde İstanbul Büyükşehir Belediyesi standartlarına uygun olarak çalışmaktayız.',
- 'mezar-yapiminda-bize-dair-bir-supheniz-bulunmasin','Genel',1,1,'2024-01-01 00:00:00.000','2024-01-01 00:00:00.000'),
+ 'Emlak alım-satım sürecinde bize güvenebilir misiniz?',
+ 'Sürecin her adımında şeffaf ve yazılı ilerleriz: portföy doğrulama, tapu/imar kontrolü, fiyat analizi, pazarlık, sözleşme ve tapu işlemleri. Amacımız alıcı ve satıcı için riskleri azaltarak işlemi sorunsuz tamamlamaktır.',
+ 'emlak-alim-satim-surecinde-bize-guvenebilir-misiniz','Genel',1,1,'2024-01-01 00:00:00.000','2024-01-01 00:00:00.000'),
 
 (UUID(),
- 'Mezar fiyatları mezar modeline göre değişir mi? Hangi mezar modellerinde fiyat artışı olur?',
- 'Evet, mezar fiyatları kullanılan malzeme ve mezar modeline göre değişiklik gösterir. Tek kişilik mermer mezar modelleri daha uygun fiyatlıdır. Granit mezar taşı, özel tasarım mezarlar ve büyük boy aile mezarları fiyat artışına neden olur. Detaylı fiyat bilgisi için bizimle iletişime geçebilirsiniz.',
- 'mezar-fiyatlari-mezar-modeline-gore-degisir-mi-hangi-mezar-modellerinde-fiyat-artisi-olur','Genel',1,2,'2024-01-01 00:00:00.000','2024-01-01 00:00:00.000'),
+ 'Konut fiyatları hangi faktörlere göre değişir?',
+ 'Fiyatı en çok etkileyen unsurlar: lokasyon, m², oda sayısı, bina yaşı, kat/cephe, ulaşım ve sosyal imkanlar, tapu niteliği (kat mülkiyeti/irtifakı), imar durumu, site aidatı, manzara ve bölgedeki arz-talep. Ayrıca doğru pazarlama ve ilan kalitesi de satış hızını doğrudan etkiler.',
+ 'konut-fiyatlari-hangi-faktorlere-gore-degisir','Genel',1,2,'2024-01-01 00:00:00.000','2024-01-01 00:00:00.000'),
 
 (UUID(),
- 'Mezar yapımı fiyatları hangi durumlarda değişir?',
- 'Mezar fiyatları; mezar boyutuna (tek kişilik, çift kişilik), kullanılan malzemeye (mermer, granit, traverten), mezar modelinin karmaşıklığına, özel tasarım isteklerine ve mezarlık lokasyonuna göre değişiklik gösterir. Ayrıca mezar aksesuarları ve özel işlemler de fiyatı etkiler.',
- 'mezar-yapimi-fiyatlari-hangi-durumlarda-degisir','Genel',1,3,'2024-01-01 00:00:00.000','2024-01-01 00:00:00.000'),
+ 'Satılık veya kiralık ev ilanı vermek için hangi bilgilere ihtiyaç var?',
+ 'İlan için temel bilgiler: adres/lokasyon, net/brüt m², oda sayısı, bina yaşı, kat bilgisi, ısınma tipi, aidat, tapu durumu, varsa site özellikleri ve doğru fotoğraflar. Satılıkta ayrıca tapu fotokopisi ve varsa iskan/ruhsat bilgileri süreci hızlandırır.',
+ 'satilik-veya-kiralik-ev-ilani-vermek-icin-hangi-bilgilere-ihtiyac-var','Ilan',1,3,'2024-01-01 00:00:00.000','2024-01-01 00:00:00.000'),
 
 (UUID(),
- 'Mezar yapılmak istediğim zaman ne gibi yollara başvurmalıyım?',
- 'Öncelikle mezar yapım konusunda araştırma yapmalı, güvenilir firmaları karşılaştırmalısınız. Bizimle iletişime geçerek ücretsiz keşif hizmeti alabilir, mezar modelleri hakkında bilgi edinebilir ve fiyat teklifi talep edebilirsiniz. Sonrasında İstanbul Büyükşehir Belediyesi''nden gerekli izinleri alarak işleme başlayabiliriz.',
- 'mezar-yapilmak-istedigim-zaman-ne-gibi-yollara-basvurmaliyim','Genel',1,4,'2024-01-01 00:00:00.000','2024-01-01 00:00:00.000'),
+ 'Evi satmak istediğimde nasıl bir yol izlemeliyim?',
+ 'Önce doğru fiyat analizi yapılır ve satış stratejisi belirlenir. Ardından taşınmazın tapu/imar kontrolleri yapılır, profesyonel fotoğraf ve ilan metni hazırlanır, hedef kitleye göre platformlarda yayınlanır. Görüşmeler sonrası kapora/sözleşme düzenlenir ve tapu randevusu ile devir tamamlanır.',
+ 'evi-satmak-istedigimde-nasil-bir-yol-izlemeliyim','Satis',1,4,'2024-01-01 00:00:00.000','2024-01-01 00:00:00.000'),
 
 (UUID(),
- 'Mezar yapımında tercih edilen mezar modelleri nelerdir?',
- 'Mezar yapımında en çok tercih edilen modeller: Mermer mezar modelleri (ekonomik ve estetik), Granit mezar modelleri (dayanıklı ve uzun ömürlü), Traverten mezar modelleri (doğal görünüm), Lahit tipi mezarlar (klasik ve ihtişamlı), Modern tasarım mezarlar ve özel yapım mezar modelleridir. Her birinin kendine özgü avantajları bulunmaktadır.',
- 'mezar-yapiminda-tercih-edilen-mezar-modelleri-nelerdir','Genel',1,5,'2024-01-01 00:00:00.000','2024-01-01 00:00:00.000'),
+ 'Kiralama sürecinde ev sahibi ve kiracı için en önemli noktalar nelerdir?',
+ 'Kira sözleşmesinin doğru düzenlenmesi, depozito ve ödeme planının net olması, demirbaş listesinin tutanakla kayıt altına alınması ve teslim tutanağı hazırlanması kritik konulardır. Kiracı tarafında gelir/kimlik doğrulama, ev sahibi tarafında taşınmazın hukuki durumu ve aidat/borç kontrolleri yapılmalıdır.',
+ 'kiralama-surecinde-ev-sahibi-ve-kiraci-icin-en-onemli-noktalar-nelerdir','Kiralama',1,5,'2024-01-01 00:00:00.000','2024-01-01 00:00:00.000'),
 
 (UUID(),
- 'Mezar yapımı ve mezar işlerinde mezar yerinin inşaat ruhsatını ne zaman çıkartabilirim?',
- 'Mezar yapımı için inşaat ruhsatını, cenaze defin işleminden 3 ay sonra İstanbul Büyükşehir Belediyesi''nden çıkartabilirsiniz. Bu süre zorunlu bekleme süresidir. Ruhsat başvurusu sırasında mezar planı, malzeme bilgileri ve teknik çizimler gereklidir. Tüm evrak işlemlerinde size yardımcı olabiliriz.',
- 'mezar-yapimi-ve-mezar-islerinde-mezar-yerinin-insaat-ruhsatini-ne-zaman-cikartabilirim','Genel',1,6,'2024-01-01 00:00:00.000','2024-01-01 00:00:00.000'),
+ 'Tapu işlemleri ne kadar sürer ve hangi belgeler gerekir?',
+ 'Süre; tapu müdürlüğünün yoğunluğuna ve evrakların eksiksiz olmasına göre değişir. Genellikle randevu günü devir tamamlanır. Kimlik, tapu bilgileri, belediye rayiç bedel yazısı, DASK poliçesi ve gerekli harç/masraf ödemeleri temel kalemlerdir. Detaylar taşınmazın niteliğine göre farklılaşabilir.',
+ 'tapu-islemleri-ne-kadar-surer-ve-hangi-belgeler-gerekir','Tapu',1,6,'2024-01-01 00:00:00.000','2024-01-01 00:00:00.000'),
 
 (UUID(),
- 'Mezar yapımında genellikle hangi mezar modelini tercih edilmektedir?',
- 'Mezar yapımında en çok tercih edilen model mermer mezar modelleridir çünkü hem estetik hem de ekonomiktir. Ancak dayanıklılık açısından granit mezar modelleri daha uzun ömürlüdür ve hava koşullarına karşı daha dirençlidir. Son yıllarda modern tasarım mezarlar da oldukça popülerdir. Tercih tamamen bütçe ve kişisel beğeniye bağlıdır.',
- 'mezar-yapiminda-genellikle-hangi-mezar-modelini-tercih-edilmektedir','Genel',1,7,'2024-01-01 00:00:00.000','2024-01-01 00:00:00.000'),
+ 'Konut kredisi ile ev almak mümkün mü? Süreç nasıl işler?',
+ 'Evet. Banka ön onay sonrası taşınmaz için ekspertiz yapılır ve kredi limiti belirlenir. Uygun bulunursa kredi sözleşmesi imzalanır, ipotek tesisi yapılır ve ödeme planına göre satış tapuda tamamlanır. Kredi sürecinde taşınmazın tapu/imar uygunluğu önemlidir.',
+ 'konut-kredisi-ile-ev-almak-mumkun-mu-surec-nasil-isler','Kredi',1,7,'2024-01-01 00:00:00.000','2024-01-01 00:00:00.000'),
 
 (UUID(),
- 'Mezar yapımında mezarı lahit mezar olarak yaptırmam uygun olur mu?',
- 'Lahit tipi mezar modeli klasik ve ihtişamlı bir görünüm sunar. Ancak lahit mezar yapımı için İstanbul Büyükşehir Belediyesi''nden özel izin almanız ve ruhsat başvurusu sırasında bu tercihinizi belirtmeniz gerekmektedir. Lahit mezarlar daha fazla alan kaplar ve maliyeti yüksektir, ancak çok estetik ve dayanıklıdır.',
- 'mezar-yapiminda-mezari-lahit-mezar-olarak-yaptirmam-uygun-olur-mu','Genel',1,8,'2024-01-01 00:00:00.000','2024-01-01 00:00:00.000'),
+ 'Ekspertiz raporu nedir, neden önemlidir?',
+ 'Ekspertiz raporu, taşınmazın piyasa değerini ve fiziksel/hukuki durumunu inceleyen değerlendirmedir. Kredi kullanımında banka için zorunlu olabilir. Alıcı açısından ise aşırı fiyatlandırma riskini azaltır ve satın alma kararını daha sağlıklı hale getirir.',
+ 'ekspertiz-raporu-nedir-neden-onemlidir','Kredi',1,8,'2024-01-01 00:00:00.000','2024-01-01 00:00:00.000'),
 
 (UUID(),
- 'Mezar yapımında mermer mezar modellerinden tercih etsem dayanıklı olur mu?',
- 'Mermer mezar modelleri doğru işçilik ve kaliteli malzeme ile yapıldığında oldukça dayanıklıdır. Mezarisi.com güvencesi ile yapılan mermer mezarlar 10 yıl garanti ile teslim edilir. Düzenli bakım ile mermer mezarlar uzun yıllar kullanılabilir. Ancak en yüksek dayanıklılık için granit mezar modellerini öneririz.',
- 'mezar-yapiminda-mermer-mezar-modellerinden-tercih-etsem-dayanikli-olur-mu','Genel',1,9,'2024-01-01 00:00:00.000','2024-01-01 00:00:00.000')
+ 'Emlak komisyonu nasıl hesaplanır ve ne zaman ödenir?',
+ 'Komisyon oranı ve ödeme koşulları, yapılan hizmet sözleşmesine göre belirlenir. Genellikle işlem sonuçlandığında (satışta tapu devrinde, kiralamada sözleşme imzalanınca) tahsil edilir. Hizmet kapsamı (pazarlama, portföy yönetimi, evrak takibi, gösterim, pazarlık vb.) net biçimde yazılı olmalıdır.',
+ 'emlak-komisyonu-nasil-hesaplanir-ve-ne-zaman-odenir','Ucretlendirme',1,9,'2024-01-01 00:00:00.000','2024-01-01 00:00:00.000')
 ON DUPLICATE KEY UPDATE
  `question`=VALUES(`question`),
  `answer`=VALUES(`answer`),
