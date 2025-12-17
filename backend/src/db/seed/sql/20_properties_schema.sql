@@ -1,7 +1,9 @@
 -- =============================================================
 -- FILE: 20_properties_schema.sql
 -- Properties + Property Assets (Sahibinden benzeri alanlar)
--- Drizzle schema ile birebir uyumlu (src/modules/properties/schema.ts)
+-- FINAL: enum + multi-select JSON kolonları + asset galerisi
+-- Drizzle schema ile birebir uyumlu:
+--   src/modules/properties/schema.ts (FINAL)
 -- =============================================================
 
 SET NAMES utf8mb4;
@@ -55,19 +57,32 @@ CREATE TABLE IF NOT EXISTS `properties` (
   -- =========================================================
   -- Filtrelenecek çekirdek alanlar
   -- =========================================================
+
+  -- Oda (legacy tekli)
   `rooms`           VARCHAR(16)    DEFAULT NULL,
+  -- ✅ Multi-select (JSON string[])
+  `rooms_multi`     JSON           DEFAULT NULL,
+
+  -- Numeric filter
   `bedrooms`        TINYINT UNSIGNED DEFAULT NULL,
 
   `building_age`    VARCHAR(32)    DEFAULT NULL,
 
+  -- Kat (legacy)
   `floor`           VARCHAR(32)    DEFAULT NULL,
   `floor_no`        INT            DEFAULT NULL,
 
   `total_floors`    INT UNSIGNED   DEFAULT NULL,
 
+  -- Isıtma (legacy tekli)
   `heating`         VARCHAR(64)    DEFAULT NULL,
+  -- ✅ Multi-select (JSON string[])
+  `heating_multi`   JSON           DEFAULT NULL,
 
-  `usage_status`    VARCHAR(32)    DEFAULT NULL,
+  -- Kullanım durumu (legacy tekli)
+  `usage_status`        VARCHAR(32)    DEFAULT NULL,
+  -- ✅ Multi-select (JSON string[])
+  `usage_status_multi`  JSON           DEFAULT NULL,
 
   -- =========================================================
   -- Bool filtreler
@@ -85,11 +100,11 @@ CREATE TABLE IF NOT EXISTS `properties` (
   `credit_eligible` TINYINT UNSIGNED NOT NULL DEFAULT 0,
   `swap`            TINYINT UNSIGNED NOT NULL DEFAULT 0,
 
-  `has_video`       TINYINT UNSIGNED NOT NULL DEFAULT 0,
-  `has_clip`        TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  `has_video`        TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  `has_clip`         TINYINT UNSIGNED NOT NULL DEFAULT 0,
   `has_virtual_tour` TINYINT UNSIGNED NOT NULL DEFAULT 0,
-  `has_map`         TINYINT UNSIGNED NOT NULL DEFAULT 1,
-  `accessible`      TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  `has_map`          TINYINT UNSIGNED NOT NULL DEFAULT 1,
+  `accessible`       TINYINT UNSIGNED NOT NULL DEFAULT 0,
 
   -- =========================================================
   -- Legacy cover (Slider ile aynı pattern)
@@ -144,7 +159,6 @@ CREATE TABLE IF NOT EXISTS `properties` (
 
   KEY `properties_image_asset_idx` (`image_asset_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 
 -- =============================================================
 -- TABLE: property_assets (ilan galerisi)

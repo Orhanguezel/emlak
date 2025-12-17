@@ -1,7 +1,8 @@
 // =============================================================
 // FILE: src/components/admin/AdminPanel/Tabs/PropertiesTab.tsx
-// Pattern: PagesTab (search + active filter + table + row actions)
-// exactOptionalPropertyTypes: undefined alanlar objeye eklenmez
+// Admin Properties List (filters + pagination + table + row actions)
+// - Filters UI reused from public: PropertiesFiltersPanel
+// - Query params builder: useAdminPropertiesFilters (admin-specific)
 // =============================================================
 "use client";
 
@@ -11,9 +12,8 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 import {
   useListPropertiesAdminQuery,
@@ -30,6 +30,13 @@ import type { AdminProperty as PropertyAdminView } from "@/integrations/rtk/type
 
 import { Plus, Pencil, Trash2, RefreshCw, Image as ImageIcon } from "lucide-react";
 
+// public components reused
+import { PropertiesFiltersPanel } from "@/components/public/properties/PropertiesFiltersPanel";
+import { unwrapList } from "@/components/public/properties/properties.selectors";
+
+// admin wrapper hook
+import { useAdminPropertiesFilters } from "@/components/admin/AdminPanel/Tabs/properties/useAdminPropertiesFilters";
+
 type LocalRow = {
   id: string;
   title: string;
@@ -40,6 +47,7 @@ type LocalRow = {
 
   city: string;
   district: string;
+  neighborhood?: string | null;
 
   price?: string | null;
   currency?: string | null;
@@ -51,43 +59,72 @@ type LocalRow = {
   updated_at?: string | null;
 };
 
+function uniqStrings(arr: string[]): string[] {
+  const set = new Set(arr.map((x) => (x || "").trim()).filter(Boolean));
+  return Array.from(set).sort((a, b) => a.localeCompare(b, "tr"));
+}
+
 export default function PropertiesTab() {
   const navigate = useNavigate();
-
-  const [q, setQ] = useState("");
-  const [onlyActive, setOnlyActive] = useState(false);
-
-  const [city, setCity] = useState("");
-  const [district, setDistrict] = useState("");
-  const [type, setType] = useState("");
-  const [status, setStatus] = useState("");
 
   const [page, setPage] = useState(0);
   const limit = 20;
   const offset = page * limit;
 
+  const {
+    filters,
+    setFilters,
+    showAdvanced,
+    setShowAdvanced,
+    clearLocalFilters,
+    queryParams,
+    onlyActive,
+    setOnlyActive,
+  } = useAdminPropertiesFilters({ limit, offset });
+
+  // Filtre değişince sayfayı sıfırla (admin pagination tutarlılığı)
+  React.useEffect(() => {
+    setPage(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    filters.search,
+    filters.city,
+    filters.district,
+    filters.neighborhood,
+    filters.type,
+    filters.status,
+    filters.price_min,
+    filters.price_max,
+    filters.gross_m2_min,
+    filters.gross_m2_max,
+    filters.rooms,
+    filters.rooms_multi.join("|"),
+    filters.bedrooms_min,
+    filters.bedrooms_max,
+    filters.building_age,
+    filters.heating,
+    filters.heating_multi.join("|"),
+    filters.usage_status,
+    filters.usage_status_multi.join("|"),
+    filters.featured,
+    filters.furnished,
+    filters.in_site,
+    filters.has_elevator,
+    filters.has_parking,
+    filters.has_balcony,
+    filters.has_garden,
+    filters.has_terrace,
+    filters.credit_eligible,
+    filters.swap,
+    filters.has_virtual_tour,
+    filters.accessible,
+    onlyActive,
+  ]);
+
   const queryArgs = useMemo<AdminListParams>(() => {
-    const args: AdminListParams = { limit, offset };
-
-    const s = q.trim();
-    if (s) args.search = s;
-
-    const c = city.trim();
-    if (c) args.city = c;
-
-    const d = district.trim();
-    if (d) args.district = d;
-
-    const t = type.trim();
-    if (t) args.type = t;
-
-    const st = status.trim();
-    if (st) args.status = st;
-
-    if (onlyActive) args.active = true;
-
-    return args;
-  }, [q, city, district, type, status, onlyActive, limit, offset]);
+    // exactOptionalPropertyTypes: undefined alan eklemiyoruz; hook zaten sadece gerekenleri koyuyor
+    return queryParams as AdminListParams;
+  }, [queryParams]);
 
   const { data, isFetching, isError, refetch } = useListPropertiesAdminQuery(queryArgs, {
     refetchOnFocus: true,
@@ -99,7 +136,7 @@ export default function PropertiesTab() {
   const [patchOne, { isLoading: updating }] = useUpdatePropertyAdminMutation();
 
   React.useEffect(() => {
-    const list = Array.isArray(data) ? data : [];
+    const list = unwrapList<PropertyAdminView>(data);
     setRows(
       list.map((p: PropertyAdminView) => ({
         id: p.id,
@@ -109,6 +146,7 @@ export default function PropertiesTab() {
         status: p.status,
         city: p.city,
         district: p.district,
+        neighborhood: (p as any).neighborhood ?? null,
         price: typeof p.price === "string" ? p.price : p.price ?? null,
         currency: p.currency ?? null,
         image_url: p.image_url ?? null,
@@ -118,6 +156,19 @@ export default function PropertiesTab() {
       })),
     );
   }, [data]);
+
+  // Options (admin filtre select’leri için)
+  // Not: Bu liste sadece "mevcut sayfadaki veriden" türetilir.
+  // Eğer global options istiyorsan admin meta endpoint ile üretmek daha doğru.
+  const options = useMemo(() => {
+    const cities = uniqStrings(rows.map((r) => r.city));
+    const districts = uniqStrings(rows.map((r) => r.district));
+    const neighborhoods = uniqStrings(rows.map((r) => r.neighborhood || "").filter(Boolean));
+    const types = uniqStrings(rows.map((r) => r.type));
+    const statuses = uniqStrings(rows.map((r) => r.status));
+
+    return { cities, districts, neighborhoods, types, statuses };
+  }, [rows]);
 
   const onAdd = () => navigate("/admin/properties/new");
   const onEdit = (id: string) => navigate(`/admin/properties/${encodeURIComponent(id)}`);
@@ -136,7 +187,6 @@ export default function PropertiesTab() {
   const toggleActive = async (p: LocalRow, v: boolean) => {
     setRows((arr) => arr.map((x) => (x.id === p.id ? { ...x, is_active: v } : x)));
 
-    // exactOptionalPropertyTypes: patch objesine sadece gerekeni koy
     const patch: Partial<PropertyUpsertBody> = { is_active: v };
 
     try {
@@ -161,93 +211,38 @@ export default function PropertiesTab() {
 
   return (
     <div className="space-y-4">
-      {/* Toolbar */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-7 lg:gap-3 w-full">
-          <div className="lg:col-span-2 space-y-1">
-            <Label>Ara</Label>
-            <Input
-              value={q}
-              onChange={(e) => {
-                setQ(e.target.value);
-                setPage(0);
-              }}
-              placeholder="Başlık/slug ile ara…"
+      {/* Filters (reused from public) */}
+      <div className="space-y-3">
+        <PropertiesFiltersPanel
+          filters={filters}
+          setFilters={setFilters}
+          showAdvanced={showAdvanced}
+          setShowAdvanced={setShowAdvanced}
+          clearLocalFilters={clearLocalFilters}
+          options={options}
+        />
+
+        {/* Admin-only toggle row (active) + actions */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <Label className="text-sm">Yalnızca Aktif</Label>
+            <Switch
+              checked={onlyActive}
+              onCheckedChange={(v) => setOnlyActive(Boolean(v))}
+              className="data-[state=checked]:bg-emerald-600"
             />
           </div>
 
-          <div className="space-y-1">
-            <Label>Şehir</Label>
-            <Input
-              value={city}
-              onChange={(e) => {
-                setCity(e.target.value);
-                setPage(0);
-              }}
-              placeholder="örn: Köln"
-            />
+          <div className="flex gap-2 justify-end">
+            <Button variant="secondary" onClick={() => refetch()} disabled={isFetching}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Yenile
+            </Button>
+            <Button onClick={onAdd} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+              <Plus className="h-4 w-4 mr-2" />
+              Yeni Emlak
+            </Button>
           </div>
-
-          <div className="space-y-1">
-            <Label>İlçe</Label>
-            <Input
-              value={district}
-              onChange={(e) => {
-                setDistrict(e.target.value);
-                setPage(0);
-              }}
-              placeholder="örn: Musteri"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <Label>Tip</Label>
-            <Input
-              value={type}
-              onChange={(e) => {
-                setType(e.target.value);
-                setPage(0);
-              }}
-              placeholder="örn: Daire"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <Label>Durum</Label>
-            <Input
-              value={status}
-              onChange={(e) => {
-                setStatus(e.target.value);
-                setPage(0);
-              }}
-              placeholder="örn: satilik"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <Label>Yalnızca Aktif</Label>
-            <div className="flex h-10 items-center">
-              <Switch
-                checked={onlyActive}
-                onCheckedChange={(v) => {
-                  setOnlyActive(v);
-                  setPage(0);
-                }}
-                className="data-[state=checked]:bg-emerald-600"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="flex gap-2 justify-end">
-          <Button variant="secondary" onClick={() => refetch()} disabled={isFetching}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Yenile
-          </Button>
-          <Button onClick={onAdd} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-            <Plus className="h-4 w-4 mr-2" />
-            Yeni Emlak
-          </Button>
         </div>
       </div>
 
@@ -320,7 +315,12 @@ export default function PropertiesTab() {
                       <Button variant="ghost" onClick={() => onEdit(r.id)} title="Düzenle">
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" onClick={() => doDelete(r)} disabled={removing} title="Sil">
+                      <Button
+                        variant="ghost"
+                        onClick={() => doDelete(r)}
+                        disabled={removing}
+                        title="Sil"
+                      >
                         <Trash2 className="h-4 w-4 text-rose-600" />
                       </Button>
                     </div>
@@ -353,7 +353,9 @@ export default function PropertiesTab() {
 
       {/* Pagination */}
       <div className="flex items-center justify-between gap-2">
-        <div className="text-xs text-gray-500">{isFetching ? "Yükleniyor…" : `Sayfa: ${page + 1}`}</div>
+        <div className="text-xs text-gray-500">
+          {isFetching ? "Yükleniyor…" : `Sayfa: ${page + 1}`}
+        </div>
         <div className="flex gap-2">
           <Button
             type="button"

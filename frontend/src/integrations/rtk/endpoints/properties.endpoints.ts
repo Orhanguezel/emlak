@@ -38,8 +38,10 @@ export type ListParams = {
   net_m2_min?: number;
   net_m2_max?: number;
 
-  // rooms
+  // legacy rooms + ✅ multi rooms
   rooms?: string;
+  rooms_multi?: string[]; // BE preprocess
+
   bedrooms_min?: number;
   bedrooms_max?: number;
 
@@ -53,9 +55,11 @@ export type ListParams = {
   total_floors_min?: number;
   total_floors_max?: number;
 
-  // heating/usage
+  // legacy heating/usage + ✅ multi
   heating?: string;
+  heating_multi?: string[];
   usage_status?: string;
+  usage_status_multi?: string[];
 
   // bool filters
   furnished?: BoolLike;
@@ -77,8 +81,8 @@ export type ListParams = {
   accessible?: BoolLike;
 
   // date range
-  created_from?: string; // ISO datetime
-  created_to?: string;   // ISO datetime
+  created_from?: string;
+  created_to?: string;
 
   // select (ops)
   select?: string;
@@ -128,6 +132,8 @@ const buildParams = (q?: ListParams): Record<string, any> => {
 
   // rooms
   if (typeof q.rooms !== "undefined") out.rooms = q.rooms;
+  if (typeof q.rooms_multi !== "undefined") out.rooms_multi = q.rooms_multi;
+
   if (typeof q.bedrooms_min !== "undefined") out.bedrooms_min = q.bedrooms_min;
   if (typeof q.bedrooms_max !== "undefined") out.bedrooms_max = q.bedrooms_max;
 
@@ -143,7 +149,10 @@ const buildParams = (q?: ListParams): Record<string, any> => {
 
   // heating/usage
   if (typeof q.heating !== "undefined") out.heating = q.heating;
+  if (typeof q.heating_multi !== "undefined") out.heating_multi = q.heating_multi;
+
   if (typeof q.usage_status !== "undefined") out.usage_status = q.usage_status;
+  if (typeof q.usage_status_multi !== "undefined") out.usage_status_multi = q.usage_status_multi;
 
   // bool filters (normalize to 0/1 when provided)
   const pushBool = (k: keyof ListParams, outKey: string) => {

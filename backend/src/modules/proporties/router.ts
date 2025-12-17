@@ -1,4 +1,6 @@
-// src/modules/properties/router.ts
+// =============================================================
+// FILE: src/modules/properties/router.ts
+// =============================================================
 import type { FastifyInstance } from "fastify";
 import {
   listPropertiesPublic,

@@ -1,5 +1,6 @@
 // =============================================================
 // FILE: src/modules/properties/validation.ts
+// FINAL: enum + multi-select destekli validation + assets tmp id fix
 // =============================================================
 import { z } from "zod";
 
@@ -18,6 +19,54 @@ export const currencySchema = z.string().trim().min(1).max(8).default("TRY");
 const numInt = z.coerce.number().int();
 const num = z.coerce.number();
 
+// =============================================================
+// ENUMS (Final)
+// =============================================================
+
+// Isıtma enum
+export const HEATING = ["kombi", "merkezi", "klima", "yerden", "soba", "dogalgaz", "isi_pompasi", "yok"] as const;
+
+// Kullanım durumu enum
+export const USAGE_STATUS = ["bos", "kiracili", "ev_sahibi", "mal_sahibi_oturuyor", "bilinmiyor"] as const;
+
+// Oda enum (istersen genişlet)
+export const ROOMS = [
+  "1+0",
+  "1+1",
+  "2+0",
+  "2+1",
+  "2+2",
+  "3+1",
+  "3+2",
+  "4+1",
+  "4+2",
+  "5+1",
+  "6+1",
+  "7+1",
+  "8+1",
+  "9+1",
+  "10+1",
+] as const;
+
+// =============================================================
+// Helpers: query array normalize (supports: ?x=a&x=b  OR ?x=a,b  OR single string)
+// =============================================================
+const toArrayFromQuery = (v: unknown): string[] | undefined => {
+  if (v == null) return undefined;
+  if (Array.isArray(v)) return v.map(String).map((s) => s.trim()).filter(Boolean);
+  if (typeof v === "string") {
+    const s = v.trim();
+    if (!s) return undefined;
+    // "a,b,c" -> ["a","b","c"]
+    if (s.includes(",")) return s.split(",").map((x) => x.trim()).filter(Boolean);
+    return [s];
+  }
+  return undefined;
+};
+
+// =============================================================
+// LIST QUERY (Final) - multi-select destekli
+// =============================================================
 export const propertyListQuerySchema = z.object({
   order: z.string().optional(),
   sort: z.enum(["created_at", "updated_at", "price", "gross_m2", "net_m2"]).optional(),
@@ -43,7 +92,11 @@ export const propertyListQuerySchema = z.object({
   net_m2_min: numInt.min(0).optional(),
   net_m2_max: numInt.min(0).optional(),
 
+  // legacy tekli
   rooms: z.string().trim().max(16).optional(),
+  // ✅ multi rooms filter
+  rooms_multi: z.preprocess(toArrayFromQuery, z.array(z.enum(ROOMS)).max(30)).optional(),
+
   bedrooms_min: numInt.min(0).optional(),
   bedrooms_max: numInt.min(0).optional(),
 
@@ -56,8 +109,15 @@ export const propertyListQuerySchema = z.object({
   total_floors_min: numInt.min(0).optional(),
   total_floors_max: numInt.min(0).optional(),
 
+  // legacy tekli
   heating: z.string().trim().max(64).optional(),
+  // ✅ multi heating filter
+  heating_multi: z.preprocess(toArrayFromQuery, z.array(z.enum(HEATING)).max(30)).optional(),
+
+  // legacy tekli
   usage_status: z.string().trim().max(32).optional(),
+  // ✅ multi usage filter
+  usage_status_multi: z.preprocess(toArrayFromQuery, z.array(z.enum(USAGE_STATUS)).max(30)).optional(),
 
   furnished: boolLike.optional(),
   in_site: boolLike.optional(),
@@ -85,7 +145,7 @@ export const propertyListQuerySchema = z.object({
 export type PropertyListQuery = z.infer<typeof propertyListQuerySchema>;
 
 // =============================================================
-// ortak: detay alanları (create/update body)
+// ortak: detay alanları (create/update body) - enum + multi alanlar final
 // =============================================================
 const propertyDetailsSchema = z.object({
   price: z.number().finite().nonnegative().nullable().optional(),
@@ -99,7 +159,11 @@ const propertyDetailsSchema = z.object({
   gross_m2: z.coerce.number().int().min(0).nullable().optional(),
   net_m2: z.coerce.number().int().min(0).nullable().optional(),
 
-  rooms: z.string().trim().max(16).nullable().optional(),
+  // legacy tekli + enum
+  rooms: z.enum(ROOMS).nullable().optional(),
+  // ✅ multi
+  rooms_multi: z.array(z.enum(ROOMS)).max(30).nullable().optional(),
+
   bedrooms: z.coerce.number().int().min(0).max(50).nullable().optional(),
 
   building_age: z.string().trim().max(32).nullable().optional(),
@@ -109,8 +173,15 @@ const propertyDetailsSchema = z.object({
 
   total_floors: z.coerce.number().int().min(0).nullable().optional(),
 
-  heating: z.string().trim().max(64).nullable().optional(),
-  usage_status: z.string().trim().max(32).nullable().optional(),
+  // legacy tekli + enum
+  heating: z.enum(HEATING).nullable().optional(),
+  // ✅ multi
+  heating_multi: z.array(z.enum(HEATING)).max(30).nullable().optional(),
+
+  // legacy tekli + enum
+  usage_status: z.enum(USAGE_STATUS).nullable().optional(),
+  // ✅ multi
+  usage_status_multi: z.array(z.enum(USAGE_STATUS)).max(30).nullable().optional(),
 
   furnished: boolLike.optional(),
   in_site: boolLike.optional(),
@@ -137,12 +208,19 @@ const propertyDetailsSchema = z.object({
 
 // =============================================================
 // assets item schema (✅ asset_id OR url required)
+// FIX: tmp_* id accept, DB always generates uuid
 // =============================================================
+const uuid36 = z.string().trim().length(36);
+
+const assetClientIdSchema = z.string().trim().min(1).max(80).optional(); // tmp_... OK
+
 const assetItemSchema = z
   .object({
-    id: z.string().trim().length(36).optional(),
-    asset_id: z.string().trim().length(36).nullable().optional(),
-    url: z.string().url().nullable().optional(),
+    // UI key: tmp_... olabilir, UUID olmak zorunda değil
+    id: assetClientIdSchema,
+
+    asset_id: uuid36.nullable().optional(),
+    url: z.string().trim().min(1).nullable().optional(), // url() yerine min(1): relative/blob vb. patlamasın
     alt: z.string().trim().max(255).nullable().optional(),
     kind: z.enum(["image", "video", "plan"]).optional().default("image"),
     mime: z.string().trim().max(100).nullable().optional(),
@@ -150,7 +228,9 @@ const assetItemSchema = z
     display_order: z.coerce.number().int().min(0).optional().default(0),
   })
   .refine(
-    (v) => (typeof v.asset_id === "string" && v.asset_id.length === 36) || (typeof v.url === "string" && v.url.length > 0),
+    (v) =>
+      (typeof v.asset_id === "string" && v.asset_id.length === 36) ||
+      (typeof v.url === "string" && v.url.trim().length > 0),
     { message: "asset_id_or_url_required" },
   );
 

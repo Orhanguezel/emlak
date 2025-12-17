@@ -1,4 +1,4 @@
-// src/components/admin/AdminPanel/form/properties/sections/PropertyGallerySection.tsx
+// src/components/admin/AdminPanel/form/properties/PropertyGallerySection.tsx
 "use client";
 
 import * as React from "react";

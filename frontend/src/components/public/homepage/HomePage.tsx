@@ -1,10 +1,14 @@
+// =============================================================
+// FILE: src/components/public/homepage/HomePage.tsx
+// =============================================================
 "use client";
 
 import { HomeLeftColumn } from "./HomeLeftColumn";
 import { HomeRightColumn } from "./HomeRightColumn";
 
-type Props = {
+export type HomePageProps = {
   onNavigate?: (page: string) => void;
+
   onOpenRecentWorkModal?: (payload: { id: string; slug?: string }) => void;
   onOpenCampaignsModal?: (payload?: any) => void;
   onOpenAnnouncementModal?: (payload?: any) => void;
@@ -14,7 +18,7 @@ export function HomePage({
   onOpenRecentWorkModal,
   onOpenCampaignsModal,
   onOpenAnnouncementModal,
-}: Props = {}) {
+}: HomePageProps = {}) {
   return (
     <section className="py-8 md:py-16 bg-white">
       <div className="container mx-auto px-4 max-w-6xl">

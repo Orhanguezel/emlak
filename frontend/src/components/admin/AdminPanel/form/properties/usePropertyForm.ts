@@ -6,10 +6,7 @@ import type {
   PropertyUpsertBody,
   PropertyPatchBody,
 } from "@/integrations/rtk/endpoints/admin/properties_admin.endpoints";
-import type {
-  AdminProperty,
-  PropertyAssetPublic,
-} from "@/integrations/rtk/types/properties";
+import type { AdminProperty, PropertyAssetPublic } from "@/integrations/rtk/types/properties";
 
 import { slugifyTr, toNum, toFloatOrNull, toIntOrNull } from "./helpers";
 
@@ -19,23 +16,23 @@ const makeTmpId = (): string =>
   `tmp_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 
 export type GalleryAsset = {
-  id: string; // ✅ her zaman zorunlu
+  id: string; // her zaman zorunlu (UI tarafı için)
 
   asset_id?: string | null;
   url?: string | null;
   alt?: string | null;
 
-  kind: "image" | "video" | "plan"; // ✅ zorunlu
+  kind: "image" | "video" | "plan";
   mime?: string | null;
 
-  is_cover: boolean; // ✅ zorunlu
-  display_order: number; // ✅ zorunlu
+  is_cover: boolean;
+  display_order: number;
 };
 
 type UploadedInput = {
   asset_id?: string | null;
   url?: string | null;
-  fileName?: string; // null yok
+  fileName?: string;
   mime?: string | null;
 };
 
@@ -50,8 +47,6 @@ const normalizeKind = (v: unknown): GalleryAsset["kind"] => {
 const ensureCoverExists = (arr: GalleryAsset[]): GalleryAsset[] => {
   if (!arr.length) return arr;
   if (arr.some((x) => x.is_cover)) return arr;
-
-  // ✅ spread yerine explicit mapping
   return arr.map((x, i) => (i === 0 ? { ...x, is_cover: true } : x));
 };
 
@@ -65,8 +60,7 @@ function normalizeAssets(input?: PropertyAssetPublic[] | null): GalleryAsset[] {
   const arr = Array.isArray(input) ? input : [];
 
   let mapped: GalleryAsset[] = arr.map((a, i) => {
-    const id =
-      typeof a.id === "string" && a.id.trim() ? a.id : makeTmpId();
+    const id = typeof a.id === "string" && a.id.trim() ? a.id : makeTmpId();
 
     return {
       id,
@@ -77,9 +71,7 @@ function normalizeAssets(input?: PropertyAssetPublic[] | null): GalleryAsset[] {
       mime: (a as any).mime ?? null,
       is_cover: !!(a as any).is_cover,
       display_order:
-        typeof (a as any).display_order === "number"
-          ? (a as any).display_order
-          : i,
+        typeof (a as any).display_order === "number" ? (a as any).display_order : i,
     };
   });
 
@@ -89,11 +81,7 @@ function normalizeAssets(input?: PropertyAssetPublic[] | null): GalleryAsset[] {
   mapped = mapped
     .slice()
     .sort((a, b) =>
-      a.is_cover === b.is_cover
-        ? a.display_order - b.display_order
-        : a.is_cover
-          ? -1
-          : 1,
+      a.is_cover === b.is_cover ? a.display_order - b.display_order : a.is_cover ? -1 : 1,
     );
 
   return reindex(mapped);
@@ -276,6 +264,7 @@ export function usePropertyForm(existing?: AdminProperty | null, isNew?: boolean
     body.image_asset_id = imageAssetId ? imageAssetId : null;
     body.alt = alt.trim() ? alt.trim() : null;
 
+    // IMPORTANT: PATCH/UPSERT ikisinde de aynı format
     body.assets = assets.map((x, i) => ({
       id: x.id,
       asset_id: x.asset_id ?? null,
@@ -293,21 +282,29 @@ export function usePropertyForm(existing?: AdminProperty | null, isNew?: boolean
   const buildPatchBody = (): PropertyPatchBody => buildUpsertBody() as any;
 
   // ------------------------------
-  // Gallery ops
+  // Gallery ops FIX (returns nextAssets)
   // ------------------------------
-  const setCoverIndex = (idx: number) => {
-    setAssets((p) => reindex(ensureSingleCover(p, idx)));
-  };
-
-  const removeAssetAt = (idx: number) => {
+  const setCoverIndex = (idx: number): GalleryAsset[] => {
+    let next: GalleryAsset[] = [];
     setAssets((p) => {
-      let next = p.filter((_, i) => i !== idx);
-      next = ensureCoverExists(next);
-      return reindex(next);
+      next = reindex(ensureSingleCover(p, idx));
+      return next;
     });
+    return next;
   };
 
-  const addUploadedAssets = (items: UploadedInput[]) => {
+  const removeAssetAt = (idx: number): GalleryAsset[] => {
+    let next: GalleryAsset[] = [];
+    setAssets((p) => {
+      const filtered = p.filter((_, i) => i !== idx);
+      next = reindex(ensureCoverExists(filtered));
+      return next;
+    });
+    return next;
+  };
+
+  const addUploadedAssets = (items: UploadedInput[]): GalleryAsset[] => {
+    let next: GalleryAsset[] = [];
     setAssets((p) => {
       const start = p.length;
 
@@ -326,44 +323,55 @@ export function usePropertyForm(existing?: AdminProperty | null, isNew?: boolean
         };
       });
 
-      let next = [...p, ...appended];
-      next = ensureCoverExists(next);
-      return reindex(next);
+      next = reindex(ensureCoverExists([...p, ...appended]));
+      return next;
     });
+    return next;
   };
 
-  // cover upload sonrası: cover'a set et + gerekirse assets'e ekle
   const upsertCoverFromUpload = (
     assetId: string | null,
     url: string | null,
     fallbackAlt?: string,
-  ) => {
+  ): GalleryAsset[] => {
     if (assetId) setImageAssetId(assetId);
     if (url) setImageUrl(url);
 
     const nextAlt = (alt.trim() || fallbackAlt || title.trim() || "").trim();
     if (!alt.trim() && nextAlt) setAlt(nextAlt);
 
+    let next: GalleryAsset[] = [];
+
     setAssets((p) => {
       const idx = assetId ? p.findIndex((x) => x.asset_id === assetId) : -1;
 
       if (idx >= 0) {
-        // cover yap + alt güncelle
-        const withCover = ensureSingleCover(p, idx);
+  const withCover = ensureSingleCover(p, idx);
 
-        const current = withCover[idx];
-        if (!current) return reindex(ensureCoverExists(withCover));
+  const current = withCover[idx];
+  if (!current) {
+    // Teoride olmaz ama TS için ve runtime güvenliği için
+    next = reindex(ensureCoverExists(withCover));
+    return next;
+  }
 
-        const newAlt = (nextAlt || current.alt || null); // ✅ || ve ?? karışmasın
-        const updated: GalleryAsset = { ...current, alt: newAlt };
+  const updated: GalleryAsset = {
+    ...current, // ✅ artık current kesin GalleryAsset
+    alt: nextAlt || current.alt || null,
+    url: url ?? current.url ?? null,
+    asset_id: assetId ?? current.asset_id ?? null,
+    is_cover: true,
+    // id/kind/display_order zaten current'tan geliyor ve zorunlu alanlar garanti
+  };
 
-        const next = withCover.slice();
-        next[idx] = updated;
+  const arr = withCover.slice();
+  arr[idx] = updated;
 
-        return reindex(ensureCoverExists(next));
-      }
+  next = reindex(ensureCoverExists(arr));
+  return next;
+}
 
-      // yoksa başa ekle
+
       const newItem: GalleryAsset = {
         id: makeTmpId(),
         asset_id: assetId ?? null,
@@ -375,49 +383,87 @@ export function usePropertyForm(existing?: AdminProperty | null, isNew?: boolean
         display_order: 0,
       };
 
-      const next = [newItem, ...p];
-      return reindex(ensureCoverExists(next));
+      next = reindex(ensureCoverExists([newItem, ...p]));
+      return next;
     });
+
+    return next;
   };
 
   return {
     // state
-    title, setTitle,
-    slug, setSlug,
-    autoSlug, setAutoSlug,
-    type, setType,
-    status, setStatus,
-    address, setAddress,
-    city, setCity,
-    district, setDistrict,
-    neighborhood, setNeighborhood,
-    lat, setLat,
-    lng, setLng,
-    description, setDescription,
-    price, setPrice,
-    currency, setCurrency,
-    minPriceAdmin, setMinPriceAdmin,
-    listingNo, setListingNo,
-    badgeText, setBadgeText,
-    featured, setFeatured,
-    grossM2, setGrossM2,
-    netM2, setNetM2,
-    rooms, setRooms,
-    buildingAge, setBuildingAge,
-    floor, setFloor,
-    totalFloors, setTotalFloors,
-    heating, setHeating,
-    furnished, setFurnished,
-    inSite, setInSite,
-    hasBalcony, setHasBalcony,
-    hasParking, setHasParking,
-    hasElevator, setHasElevator,
-    isActive, setIsActive,
-    displayOrder, setDisplayOrder,
-    imageUrl, setImageUrl,
-    imageAssetId, setImageAssetId,
-    alt, setAlt,
-    assets, setAssets,
+    title,
+    setTitle,
+    slug,
+    setSlug,
+    autoSlug,
+    setAutoSlug,
+    type,
+    setType,
+    status,
+    setStatus,
+    address,
+    setAddress,
+    city,
+    setCity,
+    district,
+    setDistrict,
+    neighborhood,
+    setNeighborhood,
+    lat,
+    setLat,
+    lng,
+    setLng,
+    description,
+    setDescription,
+    price,
+    setPrice,
+    currency,
+    setCurrency,
+    minPriceAdmin,
+    setMinPriceAdmin,
+    listingNo,
+    setListingNo,
+    badgeText,
+    setBadgeText,
+    featured,
+    setFeatured,
+    grossM2,
+    setGrossM2,
+    netM2,
+    setNetM2,
+    rooms,
+    setRooms,
+    buildingAge,
+    setBuildingAge,
+    floor,
+    setFloor,
+    totalFloors,
+    setTotalFloors,
+    heating,
+    setHeating,
+    furnished,
+    setFurnished,
+    inSite,
+    setInSite,
+    hasBalcony,
+    setHasBalcony,
+    hasParking,
+    setHasParking,
+    hasElevator,
+    setHasElevator,
+    isActive,
+    setIsActive,
+    displayOrder,
+    setDisplayOrder,
+    imageUrl,
+    setImageUrl,
+    imageAssetId,
+    setImageAssetId,
+    alt,
+    setAlt,
+    assets,
+    setAssets,
 
     // actions
     validateRequired,
