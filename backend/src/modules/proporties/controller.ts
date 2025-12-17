@@ -22,6 +22,7 @@ export const listPropertiesPublic: RouteHandler<{ Querystring: PropertyListQuery
       error: { message: "invalid_query", issues: parsed.error.issues },
     });
   }
+
   const q = parsed.data;
 
   try {
@@ -32,6 +33,7 @@ export const listPropertiesPublic: RouteHandler<{ Querystring: PropertyListQuery
       limit: q.limit,
       offset: q.offset,
 
+      // temel
       is_active: q.is_active,
       featured: q.featured,
 
@@ -42,6 +44,53 @@ export const listPropertiesPublic: RouteHandler<{ Querystring: PropertyListQuery
       neighborhood: q.neighborhood,
       type: q.type,
       status: q.status,
+
+      // range
+      price_min: q.price_min,
+      price_max: q.price_max,
+      gross_m2_min: q.gross_m2_min,
+      gross_m2_max: q.gross_m2_max,
+      net_m2_min: q.net_m2_min,
+      net_m2_max: q.net_m2_max,
+
+      // oda
+      rooms: q.rooms,
+      bedrooms_min: q.bedrooms_min,
+      bedrooms_max: q.bedrooms_max,
+
+      // bina yaşı
+      building_age: q.building_age,
+
+      // kat / kat sayısı
+      floor: q.floor,
+      floor_no_min: q.floor_no_min,
+      floor_no_max: q.floor_no_max,
+      total_floors_min: q.total_floors_min,
+      total_floors_max: q.total_floors_max,
+
+      // ısıtma / kullanım
+      heating: q.heating,
+      usage_status: q.usage_status,
+
+      // bool filtreler
+      furnished: q.furnished,
+      in_site: q.in_site,
+      has_balcony: q.has_balcony,
+      has_parking: q.has_parking,
+      has_elevator: q.has_elevator,
+      has_garden: q.has_garden,
+      has_terrace: q.has_terrace,
+      credit_eligible: q.credit_eligible,
+      swap: q.swap,
+      has_video: q.has_video,
+      has_clip: q.has_clip,
+      has_virtual_tour: q.has_virtual_tour,
+      has_map: q.has_map,
+      accessible: q.accessible,
+
+      // created_at aralığı (FE “kaç gündür yayında” hesaplar)
+      created_from: q.created_from,
+      created_to: q.created_to,
     });
 
     reply.header("x-total-count", String(total ?? 0));
@@ -130,3 +179,4 @@ export const listStatusesPublic: RouteHandler = async (req, reply) => {
     return reply.code(500).send({ error: { message: "properties_public_statuses_failed" } });
   }
 };
+

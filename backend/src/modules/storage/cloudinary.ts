@@ -69,19 +69,14 @@ async function loadStorageSettingsSafe(): Promise<StorageSettings | null> {
 
 export async function getCloudinaryConfig(): Promise<Cfg | null> {
   const now = Date.now();
-  if (cachedCfg && now - cachedAt < CFG_CACHE_MS) {
-    return cachedCfg;
-  }
+  if (cachedCfg && now - cachedAt < CFG_CACHE_MS) return cachedCfg;
 
   const settings = await loadStorageSettingsSafe();
-
   const driver: Driver = settings?.driver ?? envDriver();
 
   const cfg: Cfg = {
     driver,
-    cloudName:
-      settings?.cloudName ||
-      (driver === "local" ? "local" : ""),
+    cloudName: settings?.cloudName || (driver === "local" ? "local" : ""),
     apiKey: settings?.apiKey || undefined,
     apiSecret: settings?.apiSecret || undefined,
     defaultFolder: settings?.folder || undefined,
@@ -89,15 +84,12 @@ export async function getCloudinaryConfig(): Promise<Cfg | null> {
     localRoot: settings?.localRoot ?? null,
     localBaseUrl: settings?.localBaseUrl ?? null,
 
-    // 🔥 yeni: cdn & public api base
     cdnPublicBase: settings?.cdnPublicBase ?? null,
     publicApiBase: settings?.publicApiBase ?? null,
   };
 
   if (driver === "cloudinary") {
-    if (!cfg.cloudName || !cfg.apiKey || !cfg.apiSecret) {
-      return null;
-    }
+    if (!cfg.cloudName || !cfg.apiKey || !cfg.apiSecret) return null;
 
     cloudinary.config({
       cloud_name: cfg.cloudName,
@@ -111,7 +103,6 @@ export async function getCloudinaryConfig(): Promise<Cfg | null> {
   cachedAt = now;
   return cfg;
 }
-
 
 /* -------------------------------------------------------------------------- */
 /*                              LOCAL YÜKLEME                                  */
@@ -136,37 +127,30 @@ function guessExt(mime?: string): string {
  *      2) env.LOCAL_STORAGE_ROOT
  *      3) process.cwd()/uploads
  *  - Eğer mkdir EACCES alırsa, otomatik olarak process.cwd()/uploads'a düşer.
+ *
+ * ✅ KURAL: LOCAL'da public_id = relativePath (extension dahil)
+ *    Çünkü delete/rename tarafında dosya yolunu unlink/rename ile kullanıyoruz.
  */
-async function uploadLocal(
-  cfg: Cfg,
-  buffer: Buffer,
-  opts: UpOpts,
-): Promise<UploadResult> {
+async function uploadLocal(cfg: Cfg, buffer: Buffer, opts: UpOpts): Promise<UploadResult> {
   const fallbackRoot = path.join(process.cwd(), "uploads");
 
-  let root =
-    cfg.localRoot ||
-    env.LOCAL_STORAGE_ROOT ||
-    fallbackRoot;
+  let root = cfg.localRoot || env.LOCAL_STORAGE_ROOT || fallbackRoot;
 
-  const folder = (opts.folder ?? cfg.defaultFolder ?? "")
-    .replace(/^\/+|\/+$/g, "");
+  const folder = (opts.folder ?? cfg.defaultFolder ?? "").replace(/^\/+|\/+$/g, "");
 
   const ext = guessExt(opts.mime);
   let baseName =
     (opts.publicId && opts.publicId.replace(/^\/+/, "")) ||
     `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-  if (ext && !baseName.includes(".")) {
-    baseName += ext;
-  }
+  // opts.publicId genelde ext'siz geliyor; local dosyada ext olsun
+  if (ext && !baseName.includes(".")) baseName += ext;
 
   const relativePath = folder ? `${folder}/${baseName}` : baseName;
 
   let absDir = path.join(root, folder || ".");
   let absFile = path.join(root, relativePath);
 
-  // mkdir → EACCES ise fallback
   try {
     await fs.mkdir(absDir, { recursive: true });
   } catch (err: any) {
@@ -182,18 +166,15 @@ async function uploadLocal(
 
   await fs.writeFile(absFile, buffer);
 
-  const baseUrlRaw =
-    cfg.localBaseUrl ||
-    env.LOCAL_STORAGE_BASE_URL ||
-    "/uploads";
-
-  const baseUrl = baseUrlRaw.replace(/\/+$/, ""); // sondaki slashları sil
-  const rel = relativePath.replace(/^\/+/, "");   // baştaki slashları sil
+  const baseUrlRaw = cfg.localBaseUrl || env.LOCAL_STORAGE_BASE_URL || "/uploads";
+  const baseUrl = baseUrlRaw.replace(/\/+$/, "");
+  const rel = relativePath.replace(/^\/+/, "");
 
   const url = `${baseUrl}/${rel}`;
 
   return {
-    public_id: relativePath.replace(/\.[^.]+$/, ""),
+    // ✅ IMPORTANT FIX: ext dahil
+    public_id: rel,
     secure_url: url,
     bytes: buffer.length,
     width: null,
@@ -205,21 +186,14 @@ async function uploadLocal(
   };
 }
 
-
 /* -------------------------------------------------------------------------- */
 /*                         CLOUDINARY (SIGNED) UPLOAD                          */
 /* -------------------------------------------------------------------------- */
 
-export async function uploadBufferAuto(
-  cfg: Cfg,
-  buffer: Buffer,
-  opts: UpOpts,
-): Promise<UploadResult> {
+export async function uploadBufferAuto(cfg: Cfg, buffer: Buffer, opts: UpOpts): Promise<UploadResult> {
   const driver: Driver = cfg.driver ?? envDriver();
 
-  // LOCAL ise direkt dosyaya yaz
   if (driver === "local") {
-    // basit debug log (global)
     console.debug?.("[storage] uploadBufferAuto LOCAL", {
       folder: opts.folder ?? cfg.defaultFolder,
       publicId: opts.publicId,
@@ -238,84 +212,62 @@ export async function uploadBufferAuto(
     bytes: buffer.length,
   });
 
-  try {
-    const rawResult = await new Promise<unknown>((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        {
-          folder,
-          public_id: opts.publicId,
-          resource_type: "auto",
-          overwrite: true,
-        },
-        (err, res) => {
-          if (err || !res) {
-            return reject(err ?? new Error("upload_failed"));
-          }
-          resolve(res);
-        },
-      );
-      stream.end(buffer);
-    });
+  const rawResult = await new Promise<unknown>((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder,
+        public_id: opts.publicId,
+        resource_type: "auto",
+        overwrite: true,
+      },
+      (err, res) => {
+        if (err || !res) return reject(err ?? new Error("upload_failed"));
+        resolve(res);
+      },
+    );
+    stream.end(buffer);
+  });
 
-    const r = rawResult as {
-      public_id?: string;
-      secure_url?: string;
-      bytes?: number;
-      width?: number;
-      height?: number;
-      format?: string;
-      resource_type?: string;
-      version?: number;
-      etag?: string;
-    };
+  const r = rawResult as {
+    public_id?: string;
+    secure_url?: string;
+    bytes?: number;
+    width?: number;
+    height?: number;
+    format?: string;
+    resource_type?: string;
+    version?: number;
+    etag?: string;
+  };
 
-    if (!r.public_id || !r.secure_url) {
-      console.error(
-        "[storage] uploadBufferAuto CLOUDINARY invalid_response",
-        { cloud: cfg.cloudName, folder, publicId: opts.publicId },
-      );
-      throw new Error("cloudinary_invalid_response");
-    }
-
-    console.debug?.("[storage] uploadBufferAuto CLOUDINARY ok", {
-      cloud: cfg.cloudName,
-      public_id: r.public_id,
-      bytes: r.bytes,
-      format: r.format,
-      resource_type: r.resource_type,
-    });
-
-    return {
-      public_id: r.public_id,
-      secure_url: r.secure_url,
-      bytes: typeof r.bytes === "number" ? r.bytes : buffer.length,
-      width: typeof r.width === "number" ? r.width : null,
-      height: typeof r.height === "number" ? r.height : null,
-      format: r.format ?? null,
-      resource_type: r.resource_type ?? null,
-      version: typeof r.version === "number" ? r.version : null,
-      etag: r.etag ?? null,
-    };
-  } catch (e) {
-    const err = e as {
-      name?: string;
-      message?: string;
-      http_code?: number;
-      error?: unknown;
-    };
-    console.error("[storage] uploadBufferAuto CLOUDINARY failed", {
+  if (!r.public_id || !r.secure_url) {
+    console.error("[storage] uploadBufferAuto CLOUDINARY invalid_response", {
       cloud: cfg.cloudName,
       folder,
       publicId: opts.publicId,
-      mime: opts.mime,
-      bytes: buffer.length,
-      err_name: err?.name,
-      err_msg: err?.message,
-      http_code: err?.http_code,
-      cld_error: err?.error ?? null,
     });
-    throw e;
+    throw new Error("cloudinary_invalid_response");
   }
+
+  console.debug?.("[storage] uploadBufferAuto CLOUDINARY ok", {
+    cloud: cfg.cloudName,
+    public_id: r.public_id,
+    bytes: r.bytes,
+    format: r.format,
+    resource_type: r.resource_type,
+  });
+
+  return {
+    public_id: r.public_id,
+    secure_url: r.secure_url,
+    bytes: typeof r.bytes === "number" ? r.bytes : buffer.length,
+    width: typeof r.width === "number" ? r.width : null,
+    height: typeof r.height === "number" ? r.height : null,
+    format: r.format ?? null,
+    resource_type: r.resource_type ?? null,
+    version: typeof r.version === "number" ? r.version : null,
+    etag: r.etag ?? null,
+  };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -330,22 +282,12 @@ export async function destroyCloudinaryById(
   const cfg = await getCloudinaryConfig();
 
   const driverFromProvider: Driver | null =
-    provider === "local"
-      ? "local"
-      : provider === "cloudinary"
-      ? "cloudinary"
-      : null;
+    provider === "local" ? "local" : provider === "cloudinary" ? "cloudinary" : null;
 
-  const driver: Driver =
-    driverFromProvider ??
-    cfg?.driver ??
-    envDriver();
+  const driver: Driver = driverFromProvider ?? cfg?.driver ?? envDriver();
 
   if (driver === "local") {
-    const root =
-      cfg?.localRoot ||
-      env.LOCAL_STORAGE_ROOT ||
-      path.join(process.cwd(), "uploads");
+    const root = cfg?.localRoot || env.LOCAL_STORAGE_ROOT || path.join(process.cwd(), "uploads");
     const rel = publicId.replace(/^\/+/, "");
     const abs = path.join(root, rel);
     try {
@@ -371,22 +313,12 @@ export async function renameCloudinaryPublicId(
   const cfg = await getCloudinaryConfig();
 
   const driverFromProvider: Driver | null =
-    provider === "local"
-      ? "local"
-      : provider === "cloudinary"
-      ? "cloudinary"
-      : null;
+    provider === "local" ? "local" : provider === "cloudinary" ? "cloudinary" : null;
 
-  const driver: Driver =
-    driverFromProvider ??
-    cfg?.driver ??
-    envDriver();
+  const driver: Driver = driverFromProvider ?? cfg?.driver ?? envDriver();
 
   if (driver === "local") {
-    const root =
-      cfg?.localRoot ||
-      env.LOCAL_STORAGE_ROOT ||
-      path.join(process.cwd(), "uploads");
+    const root = cfg?.localRoot || env.LOCAL_STORAGE_ROOT || path.join(process.cwd(), "uploads");
     const oldRel = oldPublicId.replace(/^\/+/, "");
     const newRel = newPublicId.replace(/^\/+/, "");
     const oldAbs = path.join(root, oldRel);
@@ -399,11 +331,7 @@ export async function renameCloudinaryPublicId(
       // yoksa sessiz geç
     }
 
-    const baseUrlRaw =
-      cfg?.localBaseUrl ||
-      env.LOCAL_STORAGE_BASE_URL ||
-      "/uploads";
-
+    const baseUrlRaw = cfg?.localBaseUrl || env.LOCAL_STORAGE_BASE_URL || "/uploads";
     const baseUrl = baseUrlRaw.replace(/\/+$/, "");
     const rel = newRel.replace(/^\/+/, "");
 
@@ -413,14 +341,10 @@ export async function renameCloudinaryPublicId(
     };
   }
 
-  const raw = await cloudinary.uploader.rename(
-    oldPublicId,
-    newPublicId,
-    {
-      resource_type: resourceType,
-      overwrite: true,
-    },
-  );
+  const raw = await cloudinary.uploader.rename(oldPublicId, newPublicId, {
+    resource_type: resourceType,
+    overwrite: true,
+  });
 
   const r = raw as {
     public_id?: string;
