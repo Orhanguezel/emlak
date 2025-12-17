@@ -1,4 +1,4 @@
-// src/modules/proporties/router.ts
+// src/modules/properties/router.ts
 import type { FastifyInstance } from "fastify";
 import {
   listPropertiesPublic,
@@ -6,6 +6,7 @@ import {
   getPropertyBySlugPublic,
   listDistrictsPublic,
   listCitiesPublic,
+  listNeighborhoodsPublic,
   listTypesPublic,
   listStatusesPublic,
 } from "./controller";
@@ -19,6 +20,7 @@ export async function registerProperties(app: FastifyInstance) {
 
   app.get(`${BASE}/_meta/districts`, { config: { public: true } }, listDistrictsPublic);
   app.get(`${BASE}/_meta/cities`, { config: { public: true } }, listCitiesPublic);
+  app.get(`${BASE}/_meta/neighborhoods`, { config: { public: true } }, listNeighborhoodsPublic);
   app.get(`${BASE}/_meta/types`, { config: { public: true } }, listTypesPublic);
   app.get(`${BASE}/_meta/statuses`, { config: { public: true } }, listStatusesPublic);
 }
