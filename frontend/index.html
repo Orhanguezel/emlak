@@ -1,23 +1,20 @@
 <!DOCTYPE html>
 <html lang="tr" data-app="site">
   <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1, viewport-fit=cover"
-    />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 
-    <!-- Fallback SEO (JS çalışmazsa da mantıklı kalsın) -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="canonical" href="https://xemlak.com/" />
+
     <title>X Emlak | Gayrimenkul Danışmanlığı</title>
     <meta
       name="description"
       content="X Emlak ile satılık/kiralık konut, arsa ve ticari gayrimenkulleri inceleyin."
     />
     <meta name="robots" content="index,follow" />
-    <link rel="canonical" href="https://xemlak.com/" />
 
-    <!-- OG / Twitter fallback -->
+    <!-- OG / Twitter (fallback) -->
     <meta property="og:type" content="website" />
     <meta property="og:title" content="X Emlak | Gayrimenkul Danışmanlığı" />
     <meta property="og:url" content="https://xemlak.com/" />
@@ -37,8 +34,7 @@
         margin: 0;
         color: #1a202c;
         background: #fff;
-        font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
-          sans-serif;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
         line-height: 1.5;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
@@ -70,7 +66,8 @@
         }
       }
 
-      .loaded .loading-spinner {
+      /* App mount olunca (body.loaded) spinner gizlenir */
+      body.loaded .loading-spinner {
         display: none;
       }
 
@@ -86,10 +83,10 @@
     </style>
   </head>
 
+  <!-- İlk etapta loaded YOK: spinner görünsün -->
   <body>
-    <div class="loading-spinner"></div>
+    <div class="loading-spinner" aria-label="Yükleniyor"></div>
     <div id="root"></div>
-
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

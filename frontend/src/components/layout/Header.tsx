@@ -6,20 +6,57 @@ import { useLocation, useNavigate } from "react-router-dom";
 
 import { useListSiteSettingsQuery } from "@/integrations/rtk/endpoints/site_settings.endpoints";
 
+function LogoMark({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 64 48" className={className} aria-hidden="true" focusable="false">
+      {/* dış çerçeve */}
+      <rect x="2" y="2" width="60" height="44" rx="8" className="fill-slate-900" />
+
+      {/* iç panel */}
+      <rect x="10" y="10" width="44" height="30" rx="6" className="fill-white" />
+
+      {/* çatı */}
+      <path
+        d="M14 24 L32 12 L50 24"
+        className="fill-none stroke-slate-900"
+        strokeWidth="3"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+
+      {/* ev gövdesi */}
+      <path
+        d="M18 24 V36 H46 V24"
+        className="fill-none stroke-slate-900"
+        strokeWidth="3"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+
+      {/* kapı */}
+      <path
+        d="M30 36 V30 H34 V36"
+        className="fill-none stroke-slate-900"
+        strokeWidth="3"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 type HeaderMenuItem = {
   title: string;
   path: string;
   pageKey?: string;
   type?: "link" | "dropdown" | "cta";
-  /** dropdown ise: site_settings içindeki liste key’i (menu_kurumsal vs) */
-  itemsKey?: "menu_kurumsal" | "menu_other_services" | string;
+  itemsKey?: "menu_kurumsal" | string;
 };
 
 type DropdownItem = { title: string; path: string; pageKey?: string };
 
 interface HeaderProps {
-  /** Eski kullanım varsa bozulmasın diye bıraktım; artık aktiflikte pathname kullanıyoruz. */
-  currentPage: string;
+  currentPage: string; // eski kullanım uyumluluğu
   onNavigate: (page: string) => void;
   onSearch: (searchTerm: string) => void;
   searchTerm: string;
@@ -28,18 +65,19 @@ interface HeaderProps {
 const safeParseJson = <T,>(v: unknown, fallback: T): T => {
   try {
     if (v == null) return fallback;
-
-    // bazı BE’ler value’yu string JSON olarak döndürür
     if (typeof v === "string") return JSON.parse(v) as T;
-
-    // bazıları zaten obj/array döndürür
     return v as T;
   } catch {
     return fallback;
   }
 };
 
-export function Header({ currentPage: _currentPage, onNavigate, onSearch, searchTerm }: HeaderProps) {
+export function Header({
+  currentPage: _currentPage,
+  onNavigate,
+  onSearch,
+  searchTerm,
+}: HeaderProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -56,7 +94,6 @@ export function Header({ currentPage: _currentPage, onNavigate, onSearch, search
       "header_menu",
       "header_menu_right",
       "menu_kurumsal",
-      "menu_other_services",
     ],
   });
 
@@ -94,21 +131,9 @@ export function Header({ currentPage: _currentPage, onNavigate, onSearch, search
     return safeParseJson<DropdownItem[]>(get("menu_kurumsal", fallback), fallback);
   }, [settings]);
 
-  const menuOtherServices = useMemo(() => {
-    const fallback: DropdownItem[] = [
-      { title: "ÜCRETSİZ ÖN DEĞERLEME", path: "/ucretsiz-degerleme", pageKey: "free_valuation" },
-      { title: "PORTFÖY SUNUMU", path: "/emlaklar", pageKey: "properties" },
-    ];
-    return safeParseJson<DropdownItem[]>(get("menu_other_services", fallback), fallback);
-  }, [settings]);
-
   const dropdownItemsForKey = (key?: string): DropdownItem[] => {
     if (!key) return [];
     if (key === "menu_kurumsal") return menuKurumsal;
-    if (key === "menu_other_services") return menuOtherServices;
-
-    // İstersen ileride generic dropdown listeleri de buradan çekebilirsin:
-    // return safeParseJson<DropdownItem[]>(get(key, []), []);
     return [];
   };
 
@@ -149,7 +174,9 @@ export function Header({ currentPage: _currentPage, onNavigate, onSearch, search
     return location.pathname === path;
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => setLocalSearchTerm(e.target.value);
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) =>
+    setLocalSearchTerm(e.target.value);
+
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") handleSearch();
   };
@@ -180,7 +207,10 @@ export function Header({ currentPage: _currentPage, onNavigate, onSearch, search
           <div className="px-4">
             <div className="flex items-center justify-center space-x-2 text-xs">
               <span className="text-white">{infoText}</span>
-              <a href={`tel:${phoneTel}`} className="hover:text-slate-200 transition-colors whitespace-nowrap">
+              <a
+                href={`tel:${phoneTel}`}
+                className="hover:text-slate-200 transition-colors whitespace-nowrap"
+              >
                 {phoneDisplay}
               </a>
               <button
@@ -195,11 +225,11 @@ export function Header({ currentPage: _currentPage, onNavigate, onSearch, search
 
         <div className="bg-white px-4 py-4">
           <div className="flex items-center mb-4 cursor-pointer" onClick={() => go("/")}>
-            <div className="w-12 h-8 bg-slate-900 rounded mr-3 flex items-center justify-center">
-              <div className="w-8 h-6 bg-white rounded-sm relative">
-                <div className="absolute inset-1 bg-slate-900 rounded-sm" />
-              </div>
+            {/* ✅ NEW LOGO */}
+            <div className="mr-3">
+              <LogoMark className="w-12 h-8" />
             </div>
+
             <div>
               <h1 className="text-xl text-slate-900 font-bold">{brandName}</h1>
               <p className="text-xs text-gray-500">{brandTagline}</p>
@@ -233,8 +263,9 @@ export function Header({ currentPage: _currentPage, onNavigate, onSearch, search
         </div>
 
         <div
-          className={`bg-slate-900 border-t border-slate-700 transition-all duration-300 ease-in-out overflow-hidden ${isMobileMenuOpen ? "max-h-screen opacity-100" : "max-h-0 opacity-0"
-            }`}
+          className={`bg-slate-900 border-t border-slate-700 transition-all duration-300 ease-in-out overflow-hidden ${
+            isMobileMenuOpen ? "max-h-screen opacity-100" : "max-h-0 opacity-0"
+          }`}
         >
           <div className="px-4 py-2">
             {headerMenu.map((item) => {
@@ -252,8 +283,9 @@ export function Header({ currentPage: _currentPage, onNavigate, onSearch, search
                       setIsMobileMenuOpen(false);
                       setOpenMobileDropdowns({});
                     }}
-                    className={`w-full text-left py-3 px-2 border-b border-slate-700 font-medium text-white hover:bg-slate-800 transition-colors ${isActivePath(item.path) ? "bg-slate-800" : ""
-                      }`}
+                    className={`w-full text-left py-3 px-2 border-b border-slate-700 font-medium text-white hover:bg-slate-800 transition-colors ${
+                      isActivePath(item.path) ? "bg-slate-800" : ""
+                    }`}
                   >
                     {item.title}
                   </button>
@@ -264,14 +296,19 @@ export function Header({ currentPage: _currentPage, onNavigate, onSearch, search
                 <div key={key} className="border-b border-slate-700">
                   <button
                     onClick={() => toggleMobileDropdown(key)}
-                    className={`w-full flex items-center justify-between py-3 px-2 font-medium text-white hover:bg-slate-800 transition-colors ${isOpen ? "bg-slate-800" : ""
-                      }`}
+                    className={`w-full flex items-center justify-between py-3 px-2 font-medium text-white hover:bg-slate-800 transition-colors ${
+                      isOpen ? "bg-slate-800" : ""
+                    }`}
                   >
                     <span>{item.title}</span>
                     {isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                   </button>
 
-                  <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isOpen ? "max-h-80 opacity-100" : "max-h-0 opacity-0"}`}>
+                  <div
+                    className={`transition-all duration-300 ease-in-out overflow-hidden ${
+                      isOpen ? "max-h-80 opacity-100" : "max-h-0 opacity-0"
+                    }`}
+                  >
                     <div className="pl-4 pb-2">
                       {items.map((c) => (
                         <button
@@ -281,8 +318,9 @@ export function Header({ currentPage: _currentPage, onNavigate, onSearch, search
                             setIsMobileMenuOpen(false);
                             setOpenMobileDropdowns({});
                           }}
-                          className={`block w-full text-left py-2 px-2 text-sm text-white hover:bg-slate-800 transition-colors ${isActivePath(c.path) ? "bg-slate-800" : ""
-                            }`}
+                          className={`block w-full text-left py-2 px-2 text-sm text-white hover:bg-slate-800 transition-colors ${
+                            isActivePath(c.path) ? "bg-slate-800" : ""
+                          }`}
                         >
                           {c.title}
                         </button>
@@ -302,7 +340,10 @@ export function Header({ currentPage: _currentPage, onNavigate, onSearch, search
           <div className="container mx-auto px-4 max-w-7xl">
             <div className="flex items-center justify-center space-x-4 text-sm">
               <span className="text-white font-semibold">{infoText}</span>
-              <a href={`tel:${phoneTel}`} className="hover:text-slate-200 transition-colors font-bold whitespace-nowrap">
+              <a
+                href={`tel:${phoneTel}`}
+                className="hover:text-slate-200 transition-colors font-bold whitespace-nowrap"
+              >
                 {phoneDisplay}
               </a>
               <button
@@ -319,11 +360,11 @@ export function Header({ currentPage: _currentPage, onNavigate, onSearch, search
           <div className="container mx-auto px-4 max-w-7xl">
             <div className="flex items-center justify-between">
               <div className="flex items-center cursor-pointer" onClick={() => go("/")}>
-                <div className="w-16 h-10 bg-slate-900 rounded mr-4 flex items-center justify-center">
-                  <div className="w-10 h-7 bg-white rounded-sm relative">
-                    <div className="absolute inset-1 bg-slate-900 rounded-sm" />
-                  </div>
+                {/* ✅ NEW LOGO */}
+                <div className="mr-4">
+                  <LogoMark className="w-16 h-10" />
                 </div>
+
                 <div>
                   <h1 className="text-3xl text-slate-900 font-bold">{brandName}</h1>
                   <p className="text-sm text-gray-500">{brandTagline}</p>
@@ -367,8 +408,9 @@ export function Header({ currentPage: _currentPage, onNavigate, onSearch, search
                       <button
                         key={key}
                         onClick={() => go(item.path)}
-                        className={`py-3 px-4 hover:bg-slate-800 transition-colors text-sm uppercase font-bold whitespace-nowrap ${isActivePath(item.path) ? "bg-slate-800" : ""
-                          }`}
+                        className={`py-3 px-4 hover:bg-slate-800 transition-colors text-sm uppercase font-bold whitespace-nowrap ${
+                          isActivePath(item.path) ? "bg-slate-800" : ""
+                        }`}
                       >
                         {item.title}
                       </button>
@@ -379,11 +421,15 @@ export function Header({ currentPage: _currentPage, onNavigate, onSearch, search
                     <div key={key} className="relative" data-dropdown={`dd-${key}`}>
                       <button
                         onClick={() => toggleDesktopDropdown(key)}
-                        className={`py-3 px-4 hover:bg-slate-800 transition-colors text-sm uppercase font-bold whitespace-nowrap flex items-center space-x-1 ${isOpen ? "bg-slate-800" : ""
-                          }`}
+                        className={`py-3 px-4 hover:bg-slate-800 transition-colors text-sm uppercase font-bold whitespace-nowrap flex items-center space-x-1 ${
+                          isOpen ? "bg-slate-800" : ""
+                        }`}
                       >
                         <span>{item.title}</span>
-                        <ChevronDown size={14} className={`transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+                        <ChevronDown
+                          size={14}
+                          className={`transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+                        />
                       </button>
 
                       {isOpen && (
@@ -397,8 +443,11 @@ export function Header({ currentPage: _currentPage, onNavigate, onSearch, search
                                   go(c.path);
                                   closeDesktopDropdowns();
                                 }}
-                                className={`block w-full text-left py-3 px-4 text-white hover:bg-slate-800 ${!isLast ? "border-b border-slate-800" : "rounded-b-lg"
-                                  } text-sm font-bold uppercase transition-colors ${isActivePath(c.path) ? "bg-slate-800" : ""}`}
+                                className={`block w-full text-left py-3 px-4 text-white hover:bg-slate-800 ${
+                                  !isLast ? "border-b border-slate-800" : "rounded-b-lg"
+                                } text-sm font-bold uppercase transition-colors ${
+                                  isActivePath(c.path) ? "bg-slate-800" : ""
+                                }`}
                               >
                                 {c.title}
                               </button>
@@ -410,7 +459,6 @@ export function Header({ currentPage: _currentPage, onNavigate, onSearch, search
                   );
                 })}
 
-                {/* Sağ taraf CTA (opsiyonel) */}
                 {headerMenuRight.length > 0 && (
                   <div className="ml-2 flex items-center">
                     {headerMenuRight.map((x) => (

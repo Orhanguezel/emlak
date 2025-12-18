@@ -375,10 +375,6 @@ export function FAQPage({ onNavigate }: FAQPageProps) {
                         WhatsApp ile İletişim
                       </a>
                     </div>
-
-                    <div className="text-xs text-slate-500 pt-2">
-                      Not: İletişim bilgileri site ayarlarından (site_settings) çekilir.
-                    </div>
                   </div>
                 </div>
               </div>

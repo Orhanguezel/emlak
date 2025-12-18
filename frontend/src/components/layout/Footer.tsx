@@ -134,18 +134,6 @@ export function Footer({ onNavigate }: FooterProps) {
               </div>
             </div>
 
-            {/* Services */}
-            <div>
-              <h4 className="text-base md:text-lg mb-3 text-white font-semibold">Hizmetler</h4>
-              <ul className="space-y-1 text-sm text-slate-200">
-                {services.map((t) => (
-                  <li key={t} className="hover:text-white transition-colors font-medium cursor-default">
-                    {t}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
             {/* Quick Links */}
             <div>
               <h4 className="text-base md:text-lg mb-3 text-white font-semibold">Hızlı Linkler</h4>

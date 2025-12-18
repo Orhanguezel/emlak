@@ -1,6 +1,10 @@
 // =============================================================
 // FILE: src/components/public/MissionVisionPage.tsx
 // DB-first (NO fallback) — X Emlak slate theme (bg-slate-950)
+// Fixes:
+// - remove hardcoded /mezartasi.png fallback image
+// - support DB content as JSON_OBJECT('html',...) / JSON-string / raw HTML
+// - add minimal CSS fallbacks for Tailwind-like classes in DB HTML (purge/JIT)
 // =============================================================
 "use client";
 
@@ -82,6 +86,39 @@ function buildWhatsappHref(raw: string): string {
   return `https://wa.me/${cleaned}`;
 }
 
+function extractHtmlFromContent(v: unknown): string {
+  if (!v) return "";
+
+  if (typeof v === "object") {
+    const html = (v as any)?.html;
+    return typeof html === "string" ? html : "";
+  }
+
+  if (typeof v === "string") {
+    const s = v.trim();
+    if (!s) return "";
+
+    if (s.startsWith("{") || s.startsWith("[")) {
+      const obj = safeJson<any>(s, null);
+      const html = obj?.html;
+      if (typeof html === "string" && html.trim()) return html.trim();
+    }
+
+    return s;
+  }
+
+  return "";
+}
+
+function initials(name: string): string {
+  const s = (name || "").trim();
+  if (!s) return "XE";
+  const parts = s.split(/\s+/g).filter(Boolean);
+  const a = parts[0]?.[0] ?? "X";
+  const b = (parts[1]?.[0] ?? parts[0]?.[1] ?? "E") as string;
+  return (a + b).toUpperCase();
+}
+
 export function MissionVisionPage({ onNavigate }: MissionVisionPageProps) {
   const { data: page, isLoading, isError, isFetching } = useGetCustomPageBySlugQuery({
     slug: "misyon-vizyon",
@@ -90,9 +127,18 @@ export function MissionVisionPage({ onNavigate }: MissionVisionPageProps) {
   const { data: settingsRes } = useListSiteSettingsQuery({
     keys: [
       "brand_name",
+
+      // contact
       "contact_phone_display",
       "contact_phone_tel",
       "contact_whatsapp_link",
+
+      // brand visuals (opsiyonel)
+      "brand_logo_url",
+      "brand_logo",
+      "brand_image_url",
+      "brand_image",
+      "brand_logo_alt",
 
       // opsiyonel hero override
       "mission_vision_page_title",
@@ -118,28 +164,27 @@ export function MissionVisionPage({ onNavigate }: MissionVisionPageProps) {
     (page?.meta_title && String(page.meta_title)) ||
     safeJson<string>(settings["mission_vision_page_hero_title"], title);
 
-  const breadcrumb =
-    safeJson<string>(settings["mission_vision_page_breadcrumb"], `Anasayfa / ${title}`);
+  const breadcrumb = safeJson<string>(
+    settings["mission_vision_page_breadcrumb"],
+    `Anasayfa / ${title}`,
+  );
 
-  const heroImage =
-    safeJson<string>(settings["mission_vision_page_hero_image"], "") || backgroundImage;
+  const heroImageSetting = safeJson<string>(settings["mission_vision_page_hero_image"], "").trim();
+  const heroImage = heroImageSetting || backgroundImage;
 
   // Contact CTA (settings)
-  const contactPhoneDisplay = safeJson<string>(
-    settings["contact_phone_display"],
-    "+49 000 000000"
-  );
+  const contactPhoneDisplay = safeJson<string>(settings["contact_phone_display"], "+49 000 000000");
   const contactPhoneRaw = safeJson<string>(settings["contact_phone_tel"], contactPhoneDisplay);
   const telHref = buildTelHref(contactPhoneRaw);
 
   const waHref =
-    safeJson<string>(settings["contact_whatsapp_link"], "") || buildWhatsappHref(contactPhoneRaw);
+    safeJson<string>(settings["contact_whatsapp_link"], "").trim() || buildWhatsappHref(contactPhoneRaw);
 
-  // Sol içerik: sadece DB HTML
-  const html = typeof page?.content === "string" ? page.content.trim() : "";
-  const hasDbHtml = html.length > 0;
+  // Sol içerik: DB HTML (string/JSON)
+  const html = extractHtmlFromContent((page as any)?.content);
+  const hasDbHtml = html.trim().length > 0;
 
-  // Sağ blok: fallback datasız, sabit “değer kartları”
+  // Sağ blok: sabit değer kartları
   const valueCards = [
     { id: "trust", icon: "🏠", title: "Güven", subtitle: "Şeffaf süreç" },
     { id: "speed", icon: "⚡", title: "Hız", subtitle: "Hızlı dönüş" },
@@ -156,11 +201,75 @@ export function MissionVisionPage({ onNavigate }: MissionVisionPageProps) {
 
   const sidebarTitle = safeJson<string>(
     settings["mission_vision_sidebar_title"],
-    "Bizimle İletişime Geçin"
+    "Bizimle İletişime Geçin",
   );
   const sidebarSubtitle = safeJson<string>(
     settings["mission_vision_sidebar_subtitle"],
-    "İlan, yatırım veya danışmanlık için hızlıca ulaşın."
+    "İlan, yatırım veya danışmanlık için hızlıca ulaşın.",
+  );
+
+  // ✅ sidebar brand image (NO hardcoded mezar fallback)
+  const brandLogo =
+    safeJson<string>(settings["brand_logo_url"], "").trim() ||
+    safeJson<string>(settings["brand_logo"], "").trim() ||
+    safeJson<string>(settings["brand_image_url"], "").trim() ||
+    safeJson<string>(settings["brand_image"], "").trim();
+
+  const brandLogoAlt = safeJson<string>(settings["brand_logo_alt"], `${brandName} – Logo`);
+
+  // ✅ CSS fallbacks for DB HTML (Tailwind purge/JIT fix)
+  const cmsFallbackCss = React.useMemo(
+    () => `
+      .cms-html { color: #0f172a; }
+      .cms-html h1 { font-size: 1.875rem; line-height: 2.25rem; font-weight: 800; margin: 0 0 0.75rem; color: #0f172a; }
+      .cms-html h2 { font-size: 1.5rem; line-height: 2rem; font-weight: 800; margin: 0 0 0.75rem; color: #0f172a; }
+      .cms-html h3 { font-size: 1rem; line-height: 1.5rem; font-weight: 700; margin: 0 0 0.25rem; color: #0f172a; }
+      .cms-html p { margin: 0 0 1rem; color: #334155; line-height: 1.75; }
+      .cms-html ul { margin: 0.5rem 0 1rem; padding-left: 1.25rem; color: #334155; }
+      .cms-html li { margin: 0.25rem 0; }
+
+      /* minimal utility fallbacks used by seeds */
+      .cms-html .text-white { color: #ffffff !important; }
+      .cms-html .text-slate-700 { color: #334155 !important; }
+      .cms-html .text-slate-900 { color: #0f172a !important; }
+      .cms-html .text-blue-800 { color: #1e40af !important; }
+      .cms-html .bg-white { background: #ffffff !important; }
+      .cms-html .bg-slate-50 { background: #f8fafc !important; }
+      .cms-html .bg-slate-100 { background: #f1f5f9 !important; }
+      .cms-html .bg-slate-900 { background: #0f172a !important; }
+      .cms-html .bg-blue-50 { background: #eff6ff !important; }
+      .cms-html .bg-blue-600 { background: #2563eb !important; }
+      .cms-html .bg-blue-700 { background: #1d4ed8 !important; }
+      .cms-html .border { border-width: 1px; border-style: solid; border-color: #e2e8f0; }
+      .cms-html .border-slate-200 { border-color: #e2e8f0 !important; }
+      .cms-html .border-blue-200 { border-color: #bfdbfe !important; }
+      .cms-html .border-l-4 { border-left-width: 4px !important; }
+      .cms-html .border-blue-600 { border-color: #2563eb !important; }
+      .cms-html .rounded-xl { border-radius: 0.75rem !important; }
+      .cms-html .rounded-lg { border-radius: 0.5rem !important; }
+      .cms-html .p-8 { padding: 2rem !important; }
+      .cms-html .p-6 { padding: 1.5rem !important; }
+      .cms-html .p-4 { padding: 1rem !important; }
+      .cms-html .mb-8 { margin-bottom: 2rem !important; }
+      .cms-html .mb-6 { margin-bottom: 1.5rem !important; }
+      .cms-html .mb-4 { margin-bottom: 1rem !important; }
+      .cms-html .grid { display: grid !important; }
+      .cms-html .gap-6 { gap: 1.5rem !important; }
+      .cms-html .gap-8 { gap: 2rem !important; }
+
+      .cms-html .bg-gradient-to-r {
+        background-image: linear-gradient(to right, #0f172a, #1d4ed8) !important;
+        color: #fff !important;
+      }
+      .cms-html .bg-gradient-to-br {
+        background-image: linear-gradient(135deg, #f8fafc, #eff6ff) !important;
+      }
+      .cms-html .bg-gradient-to-r p,
+      .cms-html .bg-gradient-to-r h2,
+      .cms-html .bg-slate-900 p,
+      .cms-html .bg-slate-900 h2 { color: #fff !important; }
+    `,
+    [],
   );
 
   return (
@@ -168,7 +277,7 @@ export function MissionVisionPage({ onNavigate }: MissionVisionPageProps) {
       {/* Hero */}
       <div
         className="relative py-14 md:py-20 bg-slate-950 bg-cover bg-center"
-        style={{ backgroundImage: `url(${heroImage})` }}
+        style={heroImage ? { backgroundImage: `url(${heroImage})` } : undefined}
       >
         <div className="absolute inset-0 bg-slate-950/85" />
         <div className="relative container mx-auto px-4 max-w-7xl">
@@ -225,6 +334,8 @@ export function MissionVisionPage({ onNavigate }: MissionVisionPageProps) {
             <div className="flex flex-col lg:flex-row gap-10 md:gap-12">
               {/* Sol (DB HTML only) */}
               <div className="lg:w-2/3">
+                <style>{cmsFallbackCss}</style>
+
                 {isLoading || isFetching ? (
                   <div className="space-y-4">
                     <div className="h-8 bg-slate-100 rounded animate-pulse" />
@@ -232,10 +343,7 @@ export function MissionVisionPage({ onNavigate }: MissionVisionPageProps) {
                     <div className="h-40 bg-slate-100 rounded animate-pulse" />
                   </div>
                 ) : hasDbHtml ? (
-                  <div
-                    className="prose max-w-none text-slate-700 leading-relaxed"
-                    dangerouslySetInnerHTML={{ __html: html }}
-                  />
+                  <div className="cms-html" dangerouslySetInnerHTML={{ __html: html }} />
                 ) : (
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-slate-700">
                     Henüz içerik yayınlanmadı.
@@ -249,18 +357,26 @@ export function MissionVisionPage({ onNavigate }: MissionVisionPageProps) {
                 )}
               </div>
 
-              {/* Sağ sidebar (kart/CTA korunur — fallback datasız) */}
+              {/* Sağ sidebar */}
               <div className="lg:w-1/3">
                 <div className="lg:sticky lg:top-8">
-                  {/* Marka görseli */}
+                  {/* ✅ Brand: settings -> image, else monogram (NO mezar fallback) */}
                   <div className="mb-6">
                     <div className="w-full h-48 md:h-64 bg-white rounded-2xl shadow-sm overflow-hidden flex items-center justify-center border border-slate-200">
-                      <img
-                        src="/mezartasi.png"
-                        alt={`${brandName} – marka görseli`}
-                        className="max-w-full max-h-full object-contain"
-                        loading="lazy"
-                      />
+                      {brandLogo ? (
+                        <img
+                          src={brandLogo}
+                          alt={brandLogoAlt}
+                          className="max-w-full max-h-full object-contain"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-slate-50">
+                          <div className="w-20 h-20 rounded-2xl bg-slate-950 text-white flex items-center justify-center text-2xl font-extrabold">
+                            {initials(brandName)}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 

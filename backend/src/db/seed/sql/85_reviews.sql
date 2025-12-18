@@ -20,10 +20,34 @@ CREATE TABLE `reviews` (
   KEY `reviews_rating_idx`(`rating`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Opsiyonel seed
+-- Opsiyonel seed (Emlak şirketine uygun)
 INSERT INTO `reviews`
 (`id`,`name`,`email`,`rating`,`comment`,`is_active`,`is_approved`,`display_order`,`created_at`,`updated_at`)
 VALUES
-(UUID(),'Ayşe K.','ayse@example.com',5,'Hizmetten çok memnun kaldık, teşekkürler.',1,1,1,'2024-01-01 00:00:00.000','2024-01-01 00:00:00.000'),
-(UUID(),'Mehmet D.','mehmet@example.com',4,'Zamanında teslim ve özenli çalışma.',1,1,2,'2024-01-02 00:00:00.000','2024-01-02 00:00:00.000'),
-(UUID(),'Zeynep B.','zeynep@example.com',5,'İletişim çok hızlı, kaliteli işçilik.',1,1,3,'2024-01-03 00:00:00.000','2024-01-03 00:00:00.000');
+(
+  UUID(),
+  'Ayşe K.',
+  'ayse@example.com',
+  5,
+  'Evimizin satış sürecinde çok profesyonel ilerlediler. Fiyatlandırma ve pazarlama stratejisi sayesinde kısa sürede doğru alıcıyla buluştuk. Teşekkürler.',
+  1, 1, 1,
+  '2024-01-01 00:00:00.000','2024-01-01 00:00:00.000'
+),
+(
+  UUID(),
+  'Mehmet D.',
+  'mehmet@example.com',
+  4,
+  'Kiralama sürecinde tüm adımlar şeffaftı. İlan, randevu ve sözleşme aşamalarında düzenli bilgilendirme yaptılar. Genel olarak memnun kaldım.',
+  1, 1, 2,
+  '2024-01-02 00:00:00.000','2024-01-02 00:00:00.000'
+),
+(
+  UUID(),
+  'Zeynep B.',
+  'zeynep@example.com',
+  5,
+  'İletişimleri çok hızlı ve çözüm odaklıydı. Bölgeye hâkimiyetleri sayesinde beklentimize uygun evi kısa sürede bulduk. Güvenle tavsiye ederim.',
+  1, 1, 3,
+  '2024-01-03 00:00:00.000','2024-01-03 00:00:00.000'
+);

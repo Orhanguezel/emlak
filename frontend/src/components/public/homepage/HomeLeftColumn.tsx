@@ -20,7 +20,7 @@ import type { ReviewCreateInput } from "@/integrations/rtk/types/reviews";
 // shadcn carousel
 import { Carousel, CarouselContent, CarouselItem } from "../../ui/carousel";
 
-const COMMENT_IMAGE = "/calluns.avif";
+const COMMENT_IMAGE = "/cal";
 const FALLBACK_IMG = "/placeholder.webp";
 
 export type HomeLeftColumnProps = {

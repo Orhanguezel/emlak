@@ -1,13 +1,13 @@
 {
-  "name": "Xemlak.com - Mezar Taşı ve Mezar Modelleri",
-  "short_name": "Mezarisim",
-  "description": "İstanbul'un en güvenilir mezar taşı üreticisi. Mermer ve granit mezar modelleri, mezar aksesuarları ve profesyonel hizmetler.",
+  "name": "X Emlak - Gayrimenkul Danışmanlığı",
+  "short_name": "X Emlak",
+  "description": "Konut, arsa ve ticari gayrimenkulde alım-satım ve kiralama süreçlerinde şeffaf, güvenilir ve hızlı danışmanlık.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "theme_color": "#14b8a6",
-  "background_color": "#ffffff",
+  "theme_color": "#0f172a",
+  "background_color": "#0f172a",
   "lang": "tr",
   "dir": "ltr",
   "icons": [
@@ -62,43 +62,47 @@
   ],
   "categories": [
     "business",
-    "lifestyle",
-    "shopping"
+    "finance",
+    "shopping",
+    "lifestyle"
   ],
   "shortcuts": [
     {
-      "name": "Mezar Modelleri",
-      "short_name": "Modeller",
-      "description": "Mezar taşı ve mezar modellerini görüntüle",
-      "url": "/#models",
+      "name": "Emlaklar",
+      "short_name": "Emlaklar",
+      "description": "Satılık ve kiralık ilanları görüntüle",
+      "url": "/emlaklar",
       "icons": [
         {
-          "src": "/icons/shortcut-models.png",
-          "sizes": "96x96"
+          "src": "/icons/shortcut-properties.png",
+          "sizes": "96x96",
+          "type": "image/png"
         }
       ]
     },
     {
       "name": "İletişim",
       "short_name": "İletişim",
-      "description": "Bizimle iletişime geç",
-      "url": "/#contact",
+      "description": "Hızlıca iletişime geç",
+      "url": "/iletisim",
       "icons": [
         {
           "src": "/icons/shortcut-contact.png",
-          "sizes": "96x96"
+          "sizes": "96x96",
+          "type": "image/png"
         }
       ]
     },
     {
-      "name": "Hizmetler",
-      "short_name": "Hizmetler",
-      "description": "Sunduğumuz hizmetleri keşfet",
-      "url": "/#services",
+      "name": "Favoriler",
+      "short_name": "Favoriler",
+      "description": "Kaydettiğiniz ilanları görüntüle",
+      "url": "/favoriler",
       "icons": [
         {
-          "src": "/icons/shortcut-services.png",
-          "sizes": "96x96"
+          "src": "/icons/shortcut-favorites.png",
+          "sizes": "96x96",
+          "type": "image/png"
         }
       ]
     }
@@ -126,7 +130,7 @@
   },
   "protocol_handlers": [
     {
-      "protocol": "web+mezarisim",
+      "protocol": "web+xemlak",
       "url": "/?action=%s"
     }
   ]
