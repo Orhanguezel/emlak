@@ -3,14 +3,13 @@
 // X Emlak theme: bg-slate-950
 // DB-first: custom_pages by slug+locale; fallback HTML if empty.
 // Sidebar: slate theme + settings-driven tel/whatsapp.
+// NOTE: DB HTML uses Tailwind-like classes; add CSS fallbacks to avoid purge/JIT issues.
 // =============================================================
 "use client";
 
 import * as React from "react";
 import { useGetCustomPageBySlugQuery } from "@/integrations/rtk/endpoints/custom_pages.endpoints";
 import { useListSiteSettingsQuery } from "@/integrations/rtk/endpoints/site_settings.endpoints";
-
-import backgroundImage from "figma:asset/2756699d70cd757056d783eb9a7f34264d5bc04d.png";
 
 interface QualityPolicyPageProps {
   onNavigate: (page: string) => void;
@@ -84,21 +83,68 @@ function buildWhatsappHref(raw: string): string {
   return `https://wa.me/${cleaned}`;
 }
 
+/**
+ * ✅ content normalize:
+ * - DB JSON_OBJECT('html', '...') => { html: "..." } (object)
+ * - DB JSON string => "{\"html\":\"...\"}" (string)
+ * - Direkt HTML => "<section>...</section>" (string)
+ */
+function extractHtmlFromContent(v: unknown): string {
+  if (!v) return "";
+
+  if (typeof v === "object") {
+    const html = (v as any)?.html;
+    return typeof html === "string" ? html : "";
+  }
+
+  if (typeof v === "string") {
+    const s = v.trim();
+    if (!s) return "";
+
+    if (s.startsWith("{") || s.startsWith("[")) {
+      const obj = safeJson<any>(s, null);
+      const html = obj?.html;
+      if (typeof html === "string" && html.trim()) return html.trim();
+    }
+
+    return s;
+  }
+
+  return "";
+}
+
+function initials(name: string): string {
+  const s = (name || "").trim();
+  if (!s) return "XE";
+  const parts = s.split(/\s+/g).filter(Boolean);
+  const a = parts[0]?.[0] ?? "X";
+  const b = (parts[1]?.[0] ?? parts[0]?.[1] ?? "E") as string;
+  return (a + b).toUpperCase();
+}
+
 export function QualityPolicyPage({ onNavigate, locale = "tr" }: QualityPolicyPageProps) {
   const { data, isFetching, isError } = useGetCustomPageBySlugQuery({
     locale,
-    slug: "quality-policy",
+    slug: "kalite-politikamiz",
   });
 
-  // settings: brand + contact + hero override (opsiyonel)
   const { data: settingsRes } = useListSiteSettingsQuery({
     keys: [
       "brand_name",
+
+      // contact
       "contact_phone_display",
       "contact_phone_tel",
       "contact_whatsapp_link",
 
-      // opsiyonel sayfa metinleri/görseli
+      // brand visuals (opsiyonel) — varsa bunlardan birini kullan
+      "brand_logo_url",
+      "brand_logo",
+      "brand_image_url",
+      "brand_image",
+      "brand_logo_alt",
+
+      // page overrides
       "quality_policy_page_title",
       "quality_policy_page_hero_image",
       "quality_policy_page_lead",
@@ -113,21 +159,30 @@ export function QualityPolicyPage({ onNavigate, locale = "tr" }: QualityPolicyPa
     (data?.title && String(data.title)) ||
     safeJson<string>(settings["quality_policy_page_title"], "Kalite Politikamız");
 
-  const heroImage = safeJson<string>(settings["quality_policy_page_hero_image"], "") || backgroundImage;
-
-  // DB content "string" (Tailwind sınıfları içerebilir). Boş ise fallback.
-  const html =
-    typeof data?.content === "string" && data.content.trim().length > 0
-      ? data.content
-      : "";
+  const heroImage = safeJson<string>(settings["quality_policy_page_hero_image"], "").trim();
 
   const breadcrumb = `Anasayfa / ${title}`;
 
-  const lead =
-    safeJson<string>(
-      settings["quality_policy_page_lead"],
-      `${brandName} olarak müşterilerimize kalite odaklı, şeffaf ve sürdürülebilir bir hizmet standardı sunarız.`,
-    );
+  const lead = safeJson<string>(
+    settings["quality_policy_page_lead"],
+    `${brandName} olarak müşterilerimize kalite odaklı, şeffaf ve sürdürülebilir bir hizmet standardı sunarız.`,
+  );
+
+  // DB content parse
+  const htmlFromDb = extractHtmlFromContent((data as any)?.content);
+
+  const fallbackHtml = React.useMemo(
+    () =>
+      `
+      <section>
+        <h2>Kalite Politikamız</h2>
+        <p>İçerik şu anda yüklenemedi. Lütfen daha sonra tekrar deneyin veya bizimle iletişime geçin.</p>
+      </section>
+    `.trim(),
+    [],
+  );
+
+  const html = htmlFromDb || fallbackHtml;
 
   // contact CTA
   const contactPhoneDisplay = safeJson<string>(settings["contact_phone_display"], "+49 000 000000");
@@ -135,18 +190,109 @@ export function QualityPolicyPage({ onNavigate, locale = "tr" }: QualityPolicyPa
 
   const telHref = buildTelHref(contactPhoneRaw);
   const waHref =
-    safeJson<string>(settings["contact_whatsapp_link"], "") || buildWhatsappHref(contactPhoneRaw);
+    safeJson<string>(settings["contact_whatsapp_link"], "").trim() || buildWhatsappHref(contactPhoneRaw);
 
   const waMessage = "Merhaba, kalite politikası ve hizmet standartları hakkında bilgi almak istiyorum.";
-  const waHrefWithText =
-    waHref.includes("?") ? `${waHref}&text=${encodeURIComponent(waMessage)}` : `${waHref}?text=${encodeURIComponent(waMessage)}`;
+  const waHrefWithText = waHref.includes("?")
+    ? `${waHref}&text=${encodeURIComponent(waMessage)}`
+    : `${waHref}?text=${encodeURIComponent(waMessage)}`;
+
+  // ✅ sidebar brand image (NO mezar fallback)
+  const brandLogo =
+    safeJson<string>(settings["brand_logo_url"], "").trim() ||
+    safeJson<string>(settings["brand_logo"], "").trim() ||
+    safeJson<string>(settings["brand_image_url"], "").trim() ||
+    safeJson<string>(settings["brand_image"], "").trim();
+
+  const brandLogoAlt = safeJson<string>(settings["brand_logo_alt"], `${brandName} – Logo`);
+
+  // ✅ CSS fallbacks for DB HTML (Tailwind purge/JIT fix)
+  const cmsFallbackCss = React.useMemo(
+    () => `
+      /* ---------- Base typography ---------- */
+      .cms-html { color: #0f172a; }
+      .cms-html section { max-width: 100%; }
+      .cms-html h1 { font-size: 1.875rem; line-height: 2.25rem; font-weight: 800; margin: 0 0 0.75rem; color: #0f172a; }
+      .cms-html h2 { font-size: 1.5rem; line-height: 2rem; font-weight: 800; margin: 0 0 0.75rem; color: #0f172a; }
+      .cms-html h3 { font-size: 1rem; line-height: 1.5rem; font-weight: 700; margin: 0 0 0.25rem; color: #0f172a; }
+      .cms-html p { margin: 0 0 1rem; color: #334155; line-height: 1.75; }
+      .cms-html ul { margin: 0.5rem 0 1rem; padding-left: 1.25rem; color: #334155; }
+      .cms-html li { margin: 0.25rem 0; }
+
+      /* ---------- Utility fallbacks (minimal set used by seeds) ---------- */
+      .cms-html .text-white { color: #ffffff !important; }
+      .cms-html .text-white\\/95 { color: rgba(255,255,255,0.95) !important; }
+      .cms-html .text-slate-700 { color: #334155 !important; }
+      .cms-html .text-slate-900 { color: #0f172a !important; }
+      .cms-html .text-blue-800 { color: #1e40af !important; }
+      .cms-html .text-blue-600 { color: #2563eb !important; }
+      .cms-html .text-yellow-700 { color: #a16207 !important; }
+      .cms-html .text-yellow-800 { color: #854d0e !important; }
+
+      .cms-html .bg-white { background: #ffffff !important; }
+      .cms-html .bg-slate-50 { background: #f8fafc !important; }
+      .cms-html .bg-slate-100 { background: #f1f5f9 !important; }
+      .cms-html .bg-slate-900 { background: #0f172a !important; }
+      .cms-html .bg-blue-50 { background: #eff6ff !important; }
+      .cms-html .bg-blue-600 { background: #2563eb !important; }
+      .cms-html .bg-blue-700 { background: #1d4ed8 !important; }
+      .cms-html .bg-yellow-50 { background: #fefce8 !important; }
+
+      .cms-html .border { border-width: 1px; border-style: solid; border-color: #e2e8f0; }
+      .cms-html .border-slate-200 { border-color: #e2e8f0 !important; }
+      .cms-html .border-blue-200 { border-color: #bfdbfe !important; }
+      .cms-html .border-yellow-200 { border-color: #fde68a !important; }
+      .cms-html .border-l-4 { border-left-width: 4px !important; }
+      .cms-html .border-blue-600 { border-color: #2563eb !important; }
+      .cms-html .border-slate-900 { border-color: #0f172a !important; }
+
+      .cms-html .rounded-xl { border-radius: 0.75rem !important; }
+      .cms-html .rounded-lg { border-radius: 0.5rem !important; }
+      .cms-html .rounded { border-radius: 0.25rem !important; }
+
+      .cms-html .p-8 { padding: 2rem !important; }
+      .cms-html .p-6 { padding: 1.5rem !important; }
+      .cms-html .p-4 { padding: 1rem !important; }
+      .cms-html .mb-8 { margin-bottom: 2rem !important; }
+      .cms-html .mb-6 { margin-bottom: 1.5rem !important; }
+      .cms-html .mb-4 { margin-bottom: 1rem !important; }
+
+      /* grid fallbacks */
+      .cms-html .grid { display: grid !important; }
+      .cms-html .gap-6 { gap: 1.5rem !important; }
+      .cms-html .gap-8 { gap: 2rem !important; }
+
+      /* gradient fallbacks */
+      .cms-html .bg-gradient-to-r {
+        background-image: linear-gradient(to right, #0f172a, #1d4ed8) !important;
+      }
+      .cms-html .bg-gradient-to-br {
+        background-image: linear-gradient(135deg, #f8fafc, #eff6ff) !important;
+      }
+      .cms-html .from-slate-900 { --_from: #0f172a; }
+      .cms-html .to-blue-700 { --_to: #1d4ed8; }
+
+      /* ensure "taahhüt" block contrast even if classes are missing */
+      .cms-html .bg-gradient-to-r,
+      .cms-html .bg-slate-900 {
+        color: #fff !important;
+      }
+      .cms-html .bg-gradient-to-r p,
+      .cms-html .bg-slate-900 p,
+      .cms-html .bg-gradient-to-r h2,
+      .cms-html .bg-slate-900 h2 {
+        color: #fff !important;
+      }
+    `,
+    [],
+  );
 
   return (
     <div className="min-h-screen bg-slate-950">
       {/* Hero */}
       <div
         className="relative py-14 md:py-20 bg-slate-950 bg-cover bg-center"
-        style={{ backgroundImage: `url(${heroImage})` }}
+        style={heroImage ? { backgroundImage: `url(${heroImage})` } : undefined}
       >
         <div className="absolute inset-0 bg-slate-950/85" />
         <div className="relative container mx-auto px-4 max-w-7xl">
@@ -167,9 +313,7 @@ export function QualityPolicyPage({ onNavigate, locale = "tr" }: QualityPolicyPa
                 {title}
               </h1>
 
-              <p className="text-base md:text-lg text-white/80">
-                {breadcrumb}
-              </p>
+              <p className="text-base md:text-lg text-white/80">{breadcrumb}</p>
             </div>
 
             {/* 3D Gear Illustration - slate */}
@@ -217,6 +361,9 @@ export function QualityPolicyPage({ onNavigate, locale = "tr" }: QualityPolicyPa
             <div className="flex flex-col lg:flex-row gap-10 md:gap-12">
               {/* Sol: DB HTML / fallback */}
               <div className="lg:w-2/3">
+                {/* CSS fallback injection (sol içerik için) */}
+                <style>{cmsFallbackCss}</style>
+
                 {isFetching ? (
                   <div className="space-y-4">
                     <div className="h-8 bg-slate-100 rounded animate-pulse" />
@@ -237,13 +384,22 @@ export function QualityPolicyPage({ onNavigate, locale = "tr" }: QualityPolicyPa
               {/* Sağ sidebar */}
               <div className="lg:w-1/3">
                 <div className="lg:sticky lg:top-8">
+                  {/* ✅ Logo: settings'ten; yoksa mezar resmi yok, monogram var */}
                   <div className="w-full h-48 md:h-64 bg-white rounded-2xl shadow-sm overflow-hidden flex items-center justify-center border border-slate-200">
-                    <img
-                      src="/mezartasi.png"
-                      alt={`${brandName} – marka görseli`}
-                      className="max-w-full max-h-full object-contain"
-                      loading="lazy"
-                    />
+                    {brandLogo ? (
+                      <img
+                        src={brandLogo}
+                        alt={brandLogoAlt}
+                        className="max-w-full max-h-full object-contain"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-slate-50">
+                        <div className="w-20 h-20 rounded-2xl bg-slate-950 text-white flex items-center justify-center text-2xl font-extrabold">
+                          {initials(brandName)}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Metrikler - slate */}
@@ -320,7 +476,8 @@ export function QualityPolicyPage({ onNavigate, locale = "tr" }: QualityPolicyPa
                         <strong>Deneyimli Ekip</strong>
                       </p>
                       <p className="text-xs text-white/60 mt-1">
-                        İletişim: <span className="font-semibold text-white/80">{contactPhoneDisplay}</span>
+                        İletişim:{" "}
+                        <span className="font-semibold text-white/80">{contactPhoneDisplay}</span>
                       </p>
                     </div>
                   </div>

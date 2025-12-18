@@ -13,7 +13,7 @@ module.exports = {
   plugins: [],
 
   safelist: [
-    "bg-teal-500",
+    "bg-slate-950",
     "bg-teal-600",
     "text-teal-600",
     "text-teal-700",

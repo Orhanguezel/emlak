@@ -3,7 +3,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { Star } from "lucide-react";
-import { ImageWithFallback } from "../figma/ImageWithFallback";
 import { Button } from "../ui/button";
 import { Textarea } from "../ui/textarea";
 import { Input } from "../ui/input";
@@ -12,13 +11,45 @@ import {
   useListReviewsQuery,
   useCreateReviewMutation,
 } from "@/integrations/rtk/endpoints/reviews.endpoints";
-import type {
-  ReviewCreateInput,
-  ReviewView,
-} from "@/integrations/rtk/types/reviews";
+import type { ReviewCreateInput, ReviewView } from "@/integrations/rtk/types/reviews";
+
+/** ✅ Flicker-free image (no loop, fixed height) */
+function StableImage({
+  src,
+  alt,
+  className,
+  fallbackSrc,
+}: {
+  src: string;
+  alt: string;
+  className?: string;
+  fallbackSrc?: string;
+}) {
+  const [currentSrc, setCurrentSrc] = useState(src);
+  const didFallback = useRef(false);
+
+  useEffect(() => {
+    setCurrentSrc(src);
+    didFallback.current = false;
+  }, [src]);
+
+  return (
+    <img
+      src={currentSrc}
+      alt={alt}
+      className={className}
+      loading="eager"
+      decoding="async"
+      onError={() => {
+        if (didFallback.current) return;
+        didFallback.current = true;
+        if (fallbackSrc) setCurrentSrc(fallbackSrc);
+      }}
+    />
+  );
+}
 
 export function CustomerReviews() {
-  // --- Remote data (public list) ---
   const {
     data: reviews = [],
     isLoading,
@@ -35,7 +66,6 @@ export function CustomerReviews() {
 
   const [createReview, { isLoading: sending }] = useCreateReviewMutation();
 
-  // --- Local UI state ---
   const [reviewData, setReviewData] = useState<ReviewCreateInput>({
     name: "",
     email: "",
@@ -43,18 +73,15 @@ export function CustomerReviews() {
     comment: "",
   });
 
-  // collapse kontrol
   const [showForm, setShowForm] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  // collapse yükseklik ölçümü (kapalıyken yer kaplamasın)
   const contentRef = useRef<HTMLDivElement>(null);
   const [maxH, setMaxH] = useState(0);
+
   useEffect(() => {
-    // içerik değişince gerçek yüksekliği ölç
     if (showForm) {
-      const h = contentRef.current?.scrollHeight ?? 0;
-      setMaxH(h);
+      setMaxH(contentRef.current?.scrollHeight ?? 0);
     } else {
       setMaxH(0);
     }
@@ -71,6 +98,7 @@ export function CustomerReviews() {
       toast.error("Lütfen tüm alanları doldurun.");
       return;
     }
+
     try {
       await createReview({
         name: reviewData.name.trim(),
@@ -93,99 +121,116 @@ export function CustomerReviews() {
     }
   };
 
-  // Ortalama puan
   const avg = useMemo(() => {
     if (!reviews.length) return 0;
     const s = reviews.reduce((acc: number, r: ReviewView) => acc + (r.rating ?? 0), 0);
     return Math.round((s / reviews.length) * 10) / 10;
   }, [reviews]);
 
+  const avgRounded = Math.round(avg);
+
   return (
-    <section className="py-16 bg-gray-50">
-      <div className="container mx-auto px-4 max-w-3xl text-center">
-        <h2 className="text-3xl mb-12 text-teal-600">GÖRÜŞLERİNİZ BİZİM İÇİN DEĞERLİDİR</h2>
+    <section className="py-16 bg-slate-950">
+      <div className="container mx-auto px-4 max-w-3xl">
+        <div className="text-center mb-10">
+          <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-white">
+            Müşteri Yorumları
+          </h2>
+          <p className="mt-2 text-sm md:text-base text-white/70">
+            Deneyimlerinizi paylaşın; daha iyi hizmet sunmamıza yardımcı olun.
+          </p>
+        </div>
 
-        <div className="bg-white p-8 rounded-lg mb-8 text-left">
-          {/* görsel ve başlık */}
+        <div className="bg-slate-900/40 border border-white/10 p-6 md:p-8 rounded-2xl text-left shadow-sm">
           <div className="text-center">
-            <ImageWithFallback
-              src="https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?ixlib=rb-4.1.0&w=400&h=300&fit=crop&crop=center&q=80"
-              alt="Müşteri Görüşleri"
-              className="w-full max-w-md mx-auto rounded-lg mb-6"
-            />
-
-            <div className="bg-teal-600 text-white p-4 rounded-lg mb-6 inline-flex items-center space-x-3">
-              <div className="bg-white text-teal-600 px-3 py-1 rounded">
-                <span className="font-semibold">xemlak.com</span>
-              </div>
-              <span>Yaptığımız hizmetleri değerlendirmek için</span>
+            {/* ✅ yükseklik sabit: object-cover gerçekten çalışır, flicker azalır */}
+            <div className="w-full max-w-md mx-auto rounded-2xl mb-6 border border-white/10 overflow-hidden bg-white/5">
+              <StableImage
+                src="/emlak.png"
+                alt="Emlak müşteri yorumları"
+                className="w-full h-64 object-cover"
+                // fallbackSrc="/placeholder.jpg"
+              />
             </div>
 
-            {/* Özet bilgi */}
+            <div className="inline-flex items-center gap-3 rounded-2xl bg-white/5 border border-white/10 px-4 py-3 mb-6">
+              <div className="bg-white text-slate-950 px-3 py-1 rounded-xl">
+                <span className="font-semibold">xemlak.com</span>
+              </div>
+              <span className="text-sm text-white/80">
+                Hizmetimizi değerlendirmek için yorum bırakın
+              </span>
+            </div>
+
             <div className="mb-6 flex items-center justify-center gap-4">
               <div className="flex items-center gap-2">
-                <span className="text-2xl font-semibold text-teal-700">{avg || "—"}</span>
+                <span className="text-2xl font-extrabold text-white">
+                  {avg ? avg.toFixed(1) : "—"}
+                </span>
                 <div className="flex">
                   {[1, 2, 3, 4, 5].map((i) => (
                     <Star
                       key={i}
-                      className={`w-5 h-5 ${i <= Math.round(avg) ? "text-yellow-400 fill-current" : "text-gray-300"
-                        }`}
+                      className={`w-5 h-5 ${
+                        i <= avgRounded ? "text-yellow-400 fill-current" : "text-white/20"
+                      }`}
                     />
                   ))}
                 </div>
               </div>
-              <span className="text-sm text-gray-500">({reviews.length} yorum)</span>
+              <span className="text-sm text-white/60">({reviews.length} yorum)</span>
             </div>
           </div>
 
-          {/* Liste */}
           <div className="grid grid-cols-1 gap-4">
-            {isLoading && <div className="text-gray-500 text-sm">Yükleniyor...</div>}
+            {isLoading && <div className="text-white/60 text-sm">Yükleniyor...</div>}
+
             {isError && (
-              <div className="text-red-600 text-sm">
+              <div className="text-amber-200 text-sm">
                 Yorumlar yüklenemedi.{" "}
-                <button onClick={() => refetch()} className="underline">
+                <button onClick={() => refetch()} className="underline underline-offset-4">
                   Tekrar dene
                 </button>
               </div>
             )}
+
             {!isLoading && !isError && reviews.length === 0 && (
-              <div className="text-gray-500 text-sm">Henüz yorum bulunmuyor.</div>
+              <div className="text-white/60 text-sm">Henüz yorum bulunmuyor.</div>
             )}
+
             {reviews.map((r) => (
-              <div key={r.id} className="rounded-lg border border-gray-100 p-4">
-                <div className="flex items-center justify-between">
-                  <div className="font-medium text-slate-800">{r.name}</div>
+              <div key={r.id} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="font-semibold text-white">{r.name}</div>
                   <div className="flex">
                     {[1, 2, 3, 4, 5].map((s) => (
                       <Star
                         key={s}
-                        className={`w-4 h-4 ${s <= (r.rating ?? 0) ? "text-yellow-400 fill-current" : "text-gray-300"
-                          }`}
+                        className={`w-4 h-4 ${
+                          s <= (r.rating ?? 0) ? "text-yellow-400 fill-current" : "text-white/20"
+                        }`}
                       />
                     ))}
                   </div>
                 </div>
-                <div className="text-xs text-slate-500 mt-1">
+
+                <div className="text-xs text-white/50 mt-1">
                   {new Date(r.created_at).toLocaleDateString()}
                 </div>
-                <p className="text-slate-700 mt-2 whitespace-pre-wrap">{r.comment}</p>
+
+                <p className="text-white/80 mt-2 whitespace-pre-wrap">{r.comment}</p>
               </div>
             ))}
           </div>
 
-          {/* Aç/Kapa butonu */}
           <div className="mt-8 text-center">
-            <p className="text-gray-600 mb-6 leading-relaxed">
-              Memnuniyetiniz bizim önceliğimizdir. Hizmetlerimiz hakkındaki görüş ve
-              önerilerinizi bizimle paylaşın. Sizin değerli yorumlarınız, hizmet kalitemizi
-              artırmamıza yardımcı oluyor.
+            <p className="text-white/70 mb-6 leading-relaxed text-sm md:text-base">
+              Memnuniyetiniz önceliğimizdir. Görüşleriniz, hizmet kalitemizi geliştirmemize yardımcı olur.
             </p>
 
             <Button
               onClick={() => setShowForm((v) => !v)}
-              className="bg-teal-600 hover:bg-teal-700 text-white px-8 py-3 h-12"
+              className="bg-white text-slate-950 hover:bg-white/90 px-8 py-3 h-12 rounded-xl font-semibold"
               aria-expanded={showForm}
               aria-controls="review-form"
             >
@@ -193,7 +238,6 @@ export function CustomerReviews() {
             </Button>
           </div>
 
-          {/* COLLAPSE: Kapalıyken 0px, açılınca içerik yüksekliğine genişler */}
           <div
             id="review-form"
             className="transition-all duration-300 overflow-hidden"
@@ -205,48 +249,43 @@ export function CustomerReviews() {
           >
             <div ref={contentRef}>
               {submitted ? (
-                <div className="bg-teal-50 border border-teal-100 rounded-lg p-8 text-center">
-                  <div className="text-teal-600 text-6xl mb-6">✓</div>
-                  <h3 className="text-2xl mb-4 text-teal-600">Teşekkür Ederiz!</h3>
-                  <p className="text-gray-600">
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-8 text-center">
+                  <div className="text-white text-6xl mb-6">✓</div>
+                  <h3 className="text-2xl font-extrabold mb-3 text-white">Teşekkür Ederiz!</h3>
+                  <p className="text-white/70">
                     Görüşünüz başarıyla alındı. Değerli yorumunuz için teşekkür ederiz.
                   </p>
                 </div>
               ) : (
-                <form onSubmit={handleSubmit} className="mt-6 space-y-6">
+                <form onSubmit={handleSubmit} className="mt-6 space-y-5">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <Input
                       type="text"
                       value={reviewData.name}
-                      onChange={(e) =>
-                        setReviewData((prev) => ({ ...prev, name: e.target.value }))
-                      }
+                      onChange={(e) => setReviewData((prev) => ({ ...prev, name: e.target.value }))}
                       placeholder="Adınız Soyadınız"
                       required
-                      className="h-12"
+                      className="h-12 bg-white text-slate-950 placeholder:text-slate-400"
                     />
                     <Input
                       type="email"
                       value={reviewData.email}
-                      onChange={(e) =>
-                        setReviewData((prev) => ({ ...prev, email: e.target.value }))
-                      }
+                      onChange={(e) => setReviewData((prev) => ({ ...prev, email: e.target.value }))}
                       placeholder="E-posta Adresiniz"
                       required
-                      className="h-12"
+                      className="h-12 bg-white text-slate-950 placeholder:text-slate-400"
                     />
                   </div>
 
-                  <div className="flex justify-center space-x-2">
+                  <div className="flex justify-center gap-2">
                     {[1, 2, 3, 4, 5].map((star) => (
                       <button
                         key={star}
                         type="button"
                         onClick={() => handleRatingClick(star)}
-                        className={`text-3xl transition-colors ${star <= reviewData.rating
-                          ? "text-yellow-400"
-                          : "text-gray-300"
-                          }`}
+                        className={`transition-colors ${
+                          star <= reviewData.rating ? "text-yellow-400" : "text-white/30"
+                        }`}
                         aria-label={`${star} yıldız`}
                       >
                         <Star className="w-8 h-8 fill-current" />
@@ -256,31 +295,35 @@ export function CustomerReviews() {
 
                   <Textarea
                     value={reviewData.comment}
-                    onChange={(e) =>
-                      setReviewData((prev) => ({ ...prev, comment: e.target.value }))
-                    }
-                    placeholder="Hizmetlerimiz hakkındaki görüşlerinizi paylaşın..."
+                    onChange={(e) => setReviewData((prev) => ({ ...prev, comment: e.target.value }))}
+                    placeholder="Hizmetimiz hakkındaki görüşlerinizi paylaşın..."
                     rows={6}
                     required
+                    className="bg-white text-slate-950 placeholder:text-slate-400"
                   />
 
                   <div className="flex gap-4">
                     <Button
                       type="submit"
-                      className="flex-1 bg-teal-600 hover:bg-teal-700 text-white h-12"
+                      className="flex-1 bg-white text-slate-950 hover:bg-white/90 h-12 rounded-xl font-semibold"
                       disabled={sending}
                     >
                       {sending ? "Gönderiliyor..." : "Gönder"}
                     </Button>
+
                     <Button
                       type="button"
                       variant="outline"
                       onClick={() => setShowForm(false)}
-                      className="flex-1 h-12"
+                      className="flex-1 h-12 rounded-xl border-white/20 text-white hover:bg-white/5"
                       disabled={sending}
                     >
                       İptal
                     </Button>
+                  </div>
+
+                  <div className="text-[11px] text-white/50 text-center pt-2">
+                    Not: Yorumlar admin onayından sonra yayınlanır.
                   </div>
                 </form>
               )}
