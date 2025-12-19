@@ -11,8 +11,9 @@ module.exports = {
 
       // Next start (prod) - Node ile çalıştır
       interpreter: "node",
-      script: "node_modules/next/dist/bin/next",
+      script: "node_modules/.bin/next",
       args: "start -p 3015 -H 127.0.0.1",
+
 
       exec_mode: "fork",
       instances: 1,
