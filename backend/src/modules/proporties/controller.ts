@@ -1,5 +1,6 @@
 // =============================================================
 // FILE: src/modules/properties/controller.ts (PUBLIC)
+// FINAL: select=enums desteği (backward compatible)
 // =============================================================
 import type { RouteHandler } from "fastify";
 import {
@@ -12,7 +13,7 @@ import {
   listTypes as listTypesRepo,
   listStatuses as listStatusesRepo,
 } from "./repository";
-import { propertyListQuerySchema, type PropertyListQuery } from "./validation";
+import { propertyListQuerySchema, type PropertyListQuery, HEATING, USAGE_STATUS, ROOMS } from "./validation";
 
 /** LIST (public) */
 export const listPropertiesPublic: RouteHandler<{ Querystring: PropertyListQuery }> = async (req, reply) => {
@@ -24,6 +25,7 @@ export const listPropertiesPublic: RouteHandler<{ Querystring: PropertyListQuery
   }
 
   const q = parsed.data;
+  const select = Array.isArray(q.select) ? q.select : [];
 
   try {
     const { items, total } = await listPropertiesPublicRepo({
@@ -33,7 +35,6 @@ export const listPropertiesPublic: RouteHandler<{ Querystring: PropertyListQuery
       limit: q.limit,
       offset: q.offset,
 
-      // temel
       is_active: q.is_active,
       featured: q.featured,
 
@@ -45,7 +46,6 @@ export const listPropertiesPublic: RouteHandler<{ Querystring: PropertyListQuery
       type: q.type,
       status: q.status,
 
-      // range
       price_min: q.price_min,
       price_max: q.price_max,
       gross_m2_min: q.gross_m2_min,
@@ -53,29 +53,24 @@ export const listPropertiesPublic: RouteHandler<{ Querystring: PropertyListQuery
       net_m2_min: q.net_m2_min,
       net_m2_max: q.net_m2_max,
 
-      // oda
       rooms: q.rooms,
-      rooms_multi: q.rooms_multi, // ✅ NEW
+      rooms_multi: q.rooms_multi,
       bedrooms_min: q.bedrooms_min,
       bedrooms_max: q.bedrooms_max,
 
-      // bina yaşı
       building_age: q.building_age,
 
-      // kat / kat sayısı
       floor: q.floor,
       floor_no_min: q.floor_no_min,
       floor_no_max: q.floor_no_max,
       total_floors_min: q.total_floors_min,
       total_floors_max: q.total_floors_max,
 
-      // ısıtma / kullanım
       heating: q.heating,
-      heating_multi: q.heating_multi, // ✅ NEW
+      heating_multi: q.heating_multi,
       usage_status: q.usage_status,
-      usage_status_multi: q.usage_status_multi, // ✅ NEW
+      usage_status_multi: q.usage_status_multi,
 
-      // bool filtreler
       furnished: q.furnished,
       in_site: q.in_site,
       has_balcony: q.has_balcony,
@@ -91,12 +86,26 @@ export const listPropertiesPublic: RouteHandler<{ Querystring: PropertyListQuery
       has_map: q.has_map,
       accessible: q.accessible,
 
-      // created_at aralığı (FE “kaç gündür yayında” hesaplar)
       created_from: q.created_from,
       created_to: q.created_to,
     });
 
     reply.header("x-total-count", String(total ?? 0));
+
+    // ✅ select=enums/meta istenirse object dön
+    if (select.includes("enums") || select.includes("meta")) {
+      return reply.send({
+        items,
+        total,
+        enums: {
+          rooms: ROOMS,
+          heating: HEATING,
+          usage_status: USAGE_STATUS,
+        },
+      });
+    }
+
+    // default: eski davranış (array)
     return reply.send(items);
   } catch (err) {
     req.log.error({ err }, "properties_public_list_failed");

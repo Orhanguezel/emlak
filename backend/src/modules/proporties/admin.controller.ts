@@ -1,5 +1,9 @@
 // =============================================================
 // FILE: src/modules/properties/admin.controller.ts (ADMIN)
+// FINAL:
+//  - coordinates optional (null/undefined OK)
+//  - coordinates yoksa adresten geocode dener (Nominatim)
+//  - price/min_price_admin: number | null | undefined güvenli
 // =============================================================
 import type { RouteHandler } from "fastify";
 import { randomUUID } from "node:crypto";
@@ -12,7 +16,6 @@ import {
   updateProperty as updatePropertyRepo,
   deleteProperty as deletePropertyRepo,
 
-  // ✅ gallery helpers
   replacePropertyAssets,
   syncPropertyCoverFromAssets,
 } from "./repository";
@@ -26,21 +29,25 @@ import {
   type PatchPropertyBody,
 } from "./validation";
 
+import { geocodeAddressNominatim } from "./geocode";
+
 // -------------------------------------------------------------
 // Helpers
 // -------------------------------------------------------------
 const toBool = (v: unknown): boolean => v === true || v === 1 || v === "1" || v === "true";
 
-const dec6 = (v: number | string): string => {
-  if (typeof v === "number") return v.toFixed(6);
+const dec6orNull = (v: number | string | null | undefined): string | null => {
+  if (v == null) return null;
+  if (typeof v === "number") return Number.isFinite(v) ? v.toFixed(6) : null;
   const n = Number(v);
-  return Number.isFinite(n) ? n.toFixed(6) : String(v);
+  return Number.isFinite(n) ? n.toFixed(6) : null;
 };
 
-const dec2 = (v: number | string): string => {
-  if (typeof v === "number") return v.toFixed(2);
+const dec2orNull = (v: number | string | null | undefined): string | null => {
+  if (v == null) return null;
+  if (typeof v === "number") return Number.isFinite(v) ? v.toFixed(2) : null;
   const n = Number(v);
-  return Number.isFinite(n) ? n.toFixed(2) : String(v);
+  return Number.isFinite(n) ? n.toFixed(2) : null;
 };
 
 const trimOrUndef = (v: unknown): string | undefined => (typeof v === "string" ? v.trim() : undefined);
@@ -73,6 +80,11 @@ const cleanStringArrayOrNull = (v: unknown): string[] | null | undefined => {
 
   return out.length ? out : [];
 };
+
+function buildGeocodeQuery(address: string, district: string, city: string) {
+  const parts = [address, district, city].map((s) => String(s || "").trim()).filter(Boolean);
+  return parts.join(", ");
+}
 
 // -------------------------------------------------------------
 // LIST (admin)
@@ -113,7 +125,7 @@ export const listPropertiesAdmin: RouteHandler<{ Querystring: PropertyListQuery 
       net_m2_max: q.net_m2_max,
 
       rooms: q.rooms,
-      rooms_multi: q.rooms_multi, // ✅ NEW
+      rooms_multi: q.rooms_multi,
       bedrooms_min: q.bedrooms_min,
       bedrooms_max: q.bedrooms_max,
 
@@ -126,9 +138,9 @@ export const listPropertiesAdmin: RouteHandler<{ Querystring: PropertyListQuery 
       total_floors_max: q.total_floors_max,
 
       heating: q.heating,
-      heating_multi: q.heating_multi, // ✅ NEW
+      heating_multi: q.heating_multi,
       usage_status: q.usage_status,
-      usage_status_multi: q.usage_status_multi, // ✅ NEW
+      usage_status_multi: q.usage_status_multi,
 
       furnished: q.furnished,
       in_site: q.in_site,
@@ -186,7 +198,7 @@ export const getPropertyBySlugAdmin: RouteHandler<{ Params: { slug: string } }> 
 };
 
 // -------------------------------------------------------------
-// CREATE (admin) - ✅ assets + cover sync + multi enums
+// CREATE (admin)
 // -------------------------------------------------------------
 export const createPropertyAdmin: RouteHandler<{ Body: UpsertPropertyBody }> = async (req, reply) => {
   const parsed = upsertPropertyBodySchema.safeParse(req.body ?? {});
@@ -196,6 +208,26 @@ export const createPropertyAdmin: RouteHandler<{ Body: UpsertPropertyBody }> = a
   const b = parsed.data;
 
   try {
+    // ✅ coordinates yoksa geocode dene
+    let latNum: number | null = b.coordinates?.lat ?? null;
+    let lngNum: number | null = b.coordinates?.lng ?? null;
+
+    if (latNum == null || lngNum == null) {
+      const q = buildGeocodeQuery(b.address, b.district, b.city);
+      const point = await geocodeAddressNominatim(q);
+      if (point) {
+        latNum = point.lat;
+        lngNum = point.lng;
+      }
+    }
+
+    const lat = dec6orNull(latNum);
+    const lng = dec6orNull(lngNum);
+
+    // has_map: FE açıkça set etmediyse, coords varsa 1 yoksa 0
+    const hasMap =
+      typeof b.has_map !== "undefined" ? (toBool(b.has_map) ? 1 : 0) : lat && lng ? 1 : 0;
+
     const created = await createPropertyRepo({
       id: randomUUID(),
 
@@ -209,35 +241,34 @@ export const createPropertyAdmin: RouteHandler<{ Body: UpsertPropertyBody }> = a
       city: b.city.trim(),
       neighborhood: typeof b.neighborhood === "string" ? b.neighborhood.trim() : null,
 
-      lat: dec6(b.coordinates.lat),
-      lng: dec6(b.coordinates.lng),
+      lat,
+      lng,
 
       description: typeof b.description === "string" ? b.description.trim() : b.description ?? null,
 
-      price: typeof b.price === "number" ? dec2(b.price) : null,
+      price: typeof b.price === "number" ? dec2orNull(b.price) : b.price === null ? null : null,
       currency: (b.currency ?? "TRY").trim(),
-      min_price_admin: typeof b.min_price_admin === "number" ? dec2(b.min_price_admin) : null,
+      min_price_admin: typeof b.min_price_admin === "number" ? dec2orNull(b.min_price_admin) : b.min_price_admin === null ? null : null,
 
       listing_no: typeof b.listing_no === "string" ? b.listing_no.trim() : null,
       badge_text: typeof b.badge_text === "string" ? b.badge_text.trim() : null,
       featured: toBool(b.featured) ? 1 : 0,
 
-      gross_m2: typeof b.gross_m2 === "number" ? b.gross_m2 : null,
-      net_m2: typeof b.net_m2 === "number" ? b.net_m2 : null,
+      gross_m2: typeof b.gross_m2 === "number" ? b.gross_m2 : b.gross_m2 ?? null,
+      net_m2: typeof b.net_m2 === "number" ? b.net_m2 : b.net_m2 ?? null,
 
-      rooms: typeof b.rooms === "string" ? b.rooms.trim() : null,
-      bedrooms: typeof b.bedrooms === "number" ? Math.trunc(b.bedrooms) : null,
+      rooms: typeof b.rooms === "string" ? b.rooms.trim() : b.rooms ?? null,
+      bedrooms: typeof b.bedrooms === "number" ? Math.trunc(b.bedrooms) : b.bedrooms ?? null,
 
-      building_age: typeof b.building_age === "string" ? b.building_age.trim() : null,
+      building_age: typeof b.building_age === "string" ? b.building_age.trim() : b.building_age ?? null,
 
-      floor: typeof b.floor === "string" ? b.floor.trim() : null,
-      floor_no: typeof b.floor_no === "number" ? Math.trunc(b.floor_no) : null,
-      total_floors: typeof b.total_floors === "number" ? Math.trunc(b.total_floors) : null,
+      floor: typeof b.floor === "string" ? b.floor.trim() : b.floor ?? null,
+      floor_no: typeof b.floor_no === "number" ? Math.trunc(b.floor_no) : b.floor_no ?? null,
+      total_floors: typeof b.total_floors === "number" ? Math.trunc(b.total_floors) : b.total_floors ?? null,
 
-      heating: typeof b.heating === "string" ? b.heating.trim() : null,
-      usage_status: typeof b.usage_status === "string" ? b.usage_status.trim() : null,
+      heating: typeof b.heating === "string" ? b.heating.trim() : b.heating ?? null,
+      usage_status: typeof b.usage_status === "string" ? b.usage_status.trim() : b.usage_status ?? null,
 
-      // ✅ NEW: multi-select JSON alanlar
       rooms_multi: cleanStringArrayOrNull((b as any).rooms_multi) ?? null,
       heating_multi: cleanStringArrayOrNull((b as any).heating_multi) ?? null,
       usage_status_multi: cleanStringArrayOrNull((b as any).usage_status_multi) ?? null,
@@ -255,10 +286,9 @@ export const createPropertyAdmin: RouteHandler<{ Body: UpsertPropertyBody }> = a
       has_video: toBool(b.has_video) ? 1 : 0,
       has_clip: toBool(b.has_clip) ? 1 : 0,
       has_virtual_tour: toBool(b.has_virtual_tour) ? 1 : 0,
-      has_map: typeof b.has_map !== "undefined" ? (toBool(b.has_map) ? 1 : 0) : 1,
+      has_map: hasMap,
       accessible: toBool(b.accessible) ? 1 : 0,
 
-      // legacy cover (assets gelirse replacePropertyAssets cover’u sync eder)
       image_url: typeof b.image_url === "string" ? b.image_url.trim() : null,
       image_asset_id: typeof b.image_asset_id === "string" ? b.image_asset_id.trim() : null,
       alt: typeof b.alt === "string" ? b.alt.trim() : null,
@@ -274,10 +304,8 @@ export const createPropertyAdmin: RouteHandler<{ Body: UpsertPropertyBody }> = a
       return reply.code(500).send({ error: { message: "properties_admin_create_failed" } });
     }
 
-    // ✅ gallery replace + cover sync (assets is optional)
     if (Array.isArray(b.assets)) {
       await replacePropertyAssets(created.id, b.assets);
-      // replacePropertyAssets cover sync yapıyor; bunu koruyorum (mevcut davranış bozulmasın)
       await syncPropertyCoverFromAssets(created.id);
     }
 
@@ -302,7 +330,7 @@ export const createPropertyAdmin: RouteHandler<{ Body: UpsertPropertyBody }> = a
 };
 
 // -------------------------------------------------------------
-// UPDATE (admin, partial) - ✅ assets replace + cover sync + multi enums
+// UPDATE (admin)
 // -------------------------------------------------------------
 export const updatePropertyAdmin: RouteHandler<{
   Params: { id: string };
@@ -345,15 +373,37 @@ export const updatePropertyAdmin: RouteHandler<{
       patch.description = typeof b.description === "string" ? b.description.trim() : b.description ?? null;
     }
 
-    // ✅ coordinates partial
-    if (typeof b.coordinates?.lat !== "undefined") patch.lat = dec6(b.coordinates.lat);
-    if (typeof b.coordinates?.lng !== "undefined") patch.lng = dec6(b.coordinates.lng);
+    // ✅ coordinates partial patch
+    if (typeof b.coordinates?.lat !== "undefined") patch.lat = dec6orNull(b.coordinates.lat);
+    if (typeof b.coordinates?.lng !== "undefined") patch.lng = dec6orNull(b.coordinates.lng);
+
+    // ✅ eğer address/district/city değişti ve coords verilmediyse (lat/lng patch yoksa) geocode dene
+    const addressChanged = typeof address !== "undefined" || typeof district !== "undefined" || typeof city !== "undefined";
+    const coordsTouched = typeof b.coordinates?.lat !== "undefined" || typeof b.coordinates?.lng !== "undefined";
+
+    if (addressChanged && !coordsTouched) {
+      // mevcut kaydı çekip tamamla (adres patch’lenmiş olabilir)
+      const current = await getPropertyByIdAdminRepo(req.params.id);
+      if (current) {
+        const q = buildGeocodeQuery(
+          typeof address !== "undefined" ? address : current.address,
+          typeof district !== "undefined" ? district! : current.district,
+          typeof city !== "undefined" ? city! : current.city,
+        );
+        const point = await geocodeAddressNominatim(q);
+        if (point) {
+          patch.lat = dec6orNull(point.lat);
+          patch.lng = dec6orNull(point.lng);
+          if (typeof b.has_map === "undefined") patch.has_map = 1;
+        }
+      }
+    }
 
     // price
-    if (typeof b.price !== "undefined") patch.price = b.price === null ? null : dec2(b.price);
+    if (typeof b.price !== "undefined") patch.price = b.price === null ? null : dec2orNull(b.price);
     if (typeof b.currency !== "undefined") patch.currency = (b.currency ?? "TRY").trim();
     if (typeof b.min_price_admin !== "undefined") {
-      patch.min_price_admin = b.min_price_admin === null ? null : dec2(b.min_price_admin);
+      patch.min_price_admin = b.min_price_admin === null ? null : dec2orNull(b.min_price_admin);
     }
 
     // meta
@@ -365,7 +415,7 @@ export const updatePropertyAdmin: RouteHandler<{
     if (typeof b.gross_m2 !== "undefined") patch.gross_m2 = b.gross_m2 ?? null;
     if (typeof b.net_m2 !== "undefined") patch.net_m2 = b.net_m2 ?? null;
 
-    // core filters
+    // core
     if (typeof b.rooms !== "undefined") patch.rooms = b.rooms ?? null;
     if (typeof b.bedrooms !== "undefined") patch.bedrooms = b.bedrooms === null ? null : Math.trunc(b.bedrooms);
 
@@ -380,7 +430,7 @@ export const updatePropertyAdmin: RouteHandler<{
     if (typeof b.heating !== "undefined") patch.heating = b.heating ?? null;
     if (typeof b.usage_status !== "undefined") patch.usage_status = b.usage_status ?? null;
 
-    // ✅ NEW: multi-select JSON alanlar (patch)
+    // ✅ multi json
     if (typeof (b as any).rooms_multi !== "undefined") patch.rooms_multi = cleanStringArrayOrNull((b as any).rooms_multi);
     if (typeof (b as any).heating_multi !== "undefined") patch.heating_multi = cleanStringArrayOrNull((b as any).heating_multi);
     if (typeof (b as any).usage_status_multi !== "undefined") patch.usage_status_multi = cleanStringArrayOrNull((b as any).usage_status_multi);
@@ -402,7 +452,7 @@ export const updatePropertyAdmin: RouteHandler<{
     if (typeof b.has_map !== "undefined") patch.has_map = toBool(b.has_map) ? 1 : 0;
     if (typeof b.accessible !== "undefined") patch.accessible = toBool(b.accessible) ? 1 : 0;
 
-    // legacy cover direct patch (assets gelirse replacePropertyAssets cover’u sync eder)
+    // legacy cover
     if (typeof b.image_url !== "undefined") patch.image_url = b.image_url ?? null;
     if (typeof b.image_asset_id !== "undefined") patch.image_asset_id = b.image_asset_id ?? null;
     if (typeof b.alt !== "undefined") patch.alt = b.alt ?? null;
@@ -415,10 +465,8 @@ export const updatePropertyAdmin: RouteHandler<{
     const updated = await updatePropertyRepo(req.params.id, patch);
     if (!updated) return reply.code(404).send({ error: { message: "not_found" } });
 
-    // ✅ assets replace is explicit: even empty array clears gallery & cover
     if (Array.isArray(b.assets)) {
       await replacePropertyAssets(req.params.id, b.assets);
-      // replacePropertyAssets cover sync yapıyor; bunu koruyorum (mevcut davranış bozulmasın)
       await syncPropertyCoverFromAssets(req.params.id);
     }
 
@@ -443,7 +491,7 @@ export const updatePropertyAdmin: RouteHandler<{
 };
 
 // -------------------------------------------------------------
-// DELETE (admin) - ✅ property_assets + related storage cleanup
+// DELETE (admin)
 // -------------------------------------------------------------
 export const removePropertyAdmin: RouteHandler<{ Params: { id: string } }> = async (req, reply) => {
   try {

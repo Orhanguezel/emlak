@@ -6,17 +6,18 @@ import type {
   PropertyUpsertBody,
   PropertyPatchBody,
 } from "@/integrations/rtk/endpoints/admin/properties_admin.endpoints";
-import type { AdminProperty, PropertyAssetPublic } from "@/integrations/rtk/types/properties";
+
+import type { AdminProperty, PropertyAssetPublic, Heating, Rooms } from "@/integrations/rtk/types/properties";
+import { HEATING, ROOMS } from "@/integrations/rtk/types/properties";
 
 import { slugifyTr, toNum, toFloatOrNull, toIntOrNull } from "./helpers";
 
-/** client-side stable id (DB id yoksa) */
 const makeTmpId = (): string =>
   globalThis.crypto?.randomUUID?.() ??
   `tmp_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 
 export type GalleryAsset = {
-  id: string; // her zaman zorunlu (UI tarafı için)
+  id: string;
 
   asset_id?: string | null;
   url?: string | null;
@@ -36,9 +37,6 @@ type UploadedInput = {
   mime?: string | null;
 };
 
-// ------------------------------
-// Helpers (TS-safe)
-// ------------------------------
 const normalizeKind = (v: unknown): GalleryAsset["kind"] => {
   if (v === "video" || v === "plan" || v === "image") return v;
   return "image";
@@ -70,14 +68,12 @@ function normalizeAssets(input?: PropertyAssetPublic[] | null): GalleryAsset[] {
       kind: normalizeKind((a as any).kind),
       mime: (a as any).mime ?? null,
       is_cover: !!(a as any).is_cover,
-      display_order:
-        typeof (a as any).display_order === "number" ? (a as any).display_order : i,
+      display_order: typeof (a as any).display_order === "number" ? (a as any).display_order : i,
     };
   });
 
   mapped = ensureCoverExists(mapped);
 
-  // cover öne, sonra display_order
   mapped = mapped
     .slice()
     .sort((a, b) =>
@@ -87,8 +83,15 @@ function normalizeAssets(input?: PropertyAssetPublic[] | null): GalleryAsset[] {
   return reindex(mapped);
 }
 
+const asEnumOrEmpty = <T extends readonly string[]>(
+  list: T,
+  v: string,
+): T[number] | "" => {
+  const s = String(v ?? "").trim();
+  return (list as readonly string[]).includes(s) ? (s as T[number]) : "";
+};
+
 export function usePropertyForm(existing?: AdminProperty | null, isNew?: boolean) {
-  // core
   const [title, setTitle] = React.useState("");
   const [slug, setSlug] = React.useState("");
   const [autoSlug, setAutoSlug] = React.useState(true);
@@ -106,45 +109,39 @@ export function usePropertyForm(existing?: AdminProperty | null, isNew?: boolean
 
   const [description, setDescription] = React.useState("");
 
-  // pricing
   const [price, setPrice] = React.useState("");
   const [currency, setCurrency] = React.useState("TRY");
   const [minPriceAdmin, setMinPriceAdmin] = React.useState("");
 
-  // meta
   const [listingNo, setListingNo] = React.useState("");
   const [badgeText, setBadgeText] = React.useState("");
   const [featured, setFeatured] = React.useState(false);
 
-  // details
   const [grossM2, setGrossM2] = React.useState("");
   const [netM2, setNetM2] = React.useState("");
-  const [rooms, setRooms] = React.useState("");
+
+  const [rooms, setRooms] = React.useState<Rooms | "">("");
   const [buildingAge, setBuildingAge] = React.useState("");
   const [floor, setFloor] = React.useState("");
   const [totalFloors, setTotalFloors] = React.useState("");
 
-  // booleans
-  const [heating, setHeating] = React.useState("");
+  const [heating, setHeating] = React.useState<Heating | "">("");
+
   const [furnished, setFurnished] = React.useState(false);
   const [inSite, setInSite] = React.useState(false);
   const [hasBalcony, setHasBalcony] = React.useState(false);
   const [hasParking, setHasParking] = React.useState(false);
   const [hasElevator, setHasElevator] = React.useState(false);
 
-  // publish/sort
   const [isActive, setIsActive] = React.useState(true);
   const [displayOrder, setDisplayOrder] = React.useState<number>(0);
 
-  // cover (legacy)
   const [imageUrl, setImageUrl] = React.useState<string>("");
   const [imageAssetId, setImageAssetId] = React.useState<string | undefined>(undefined);
   const [alt, setAlt] = React.useState<string>("");
 
-  // gallery
   const [assets, setAssets] = React.useState<GalleryAsset[]>([]);
 
-  // hydrate
   React.useEffect(() => {
     if (!isNew && existing) {
       setTitle(existing.title ?? "");
@@ -173,12 +170,14 @@ export function usePropertyForm(existing?: AdminProperty | null, isNew?: boolean
 
       setGrossM2(existing.gross_m2 != null ? String(existing.gross_m2) : "");
       setNetM2(existing.net_m2 != null ? String(existing.net_m2) : "");
-      setRooms(existing.rooms ?? "");
+
+      setRooms(asEnumOrEmpty(ROOMS, existing.rooms ?? ""));
       setBuildingAge(existing.building_age ?? "");
       setFloor(existing.floor ?? "");
       setTotalFloors(existing.total_floors != null ? String(existing.total_floors) : "");
 
-      setHeating(existing.heating ?? "");
+      setHeating(asEnumOrEmpty(HEATING, existing.heating ?? ""));
+
       setFurnished(!!existing.furnished);
       setInSite(!!existing.in_site);
       setHasBalcony(!!existing.has_balcony);
@@ -196,7 +195,6 @@ export function usePropertyForm(existing?: AdminProperty | null, isNew?: boolean
     }
   }, [existing, isNew]);
 
-  // auto slug
   React.useEffect(() => {
     if (autoSlug) setSlug(slugifyTr(title));
   }, [title, autoSlug]);
@@ -205,7 +203,6 @@ export function usePropertyForm(existing?: AdminProperty | null, isNew?: boolean
     if (!title.trim() || !slug.trim()) return "Başlık ve slug zorunlu";
     if (!type.trim() || !status.trim()) return "Tip ve durum zorunlu";
     if (!address.trim() || !city.trim() || !district.trim()) return "Adres/Şehir/İlçe zorunlu";
-    if (!lat.trim() || !lng.trim()) return "Latitude/Longitude zorunlu";
     return null;
   };
 
@@ -218,14 +215,23 @@ export function usePropertyForm(existing?: AdminProperty | null, isNew?: boolean
       address: address.trim(),
       district: district.trim(),
       city: city.trim(),
-      coordinates: { lat: toNum(lat), lng: toNum(lng) },
       description: description ? description : null,
+
       is_active: isActive,
       display_order: Number(displayOrder) || 0,
     };
 
     const nbh = neighborhood.trim();
     if (nbh) body.neighborhood = nbh;
+
+    const latTrim = lat.trim();
+    const lngTrim = lng.trim();
+    if (latTrim || lngTrim) {
+      body.coordinates = {
+        lat: latTrim ? toNum(latTrim) : null,
+        lng: lngTrim ? toNum(lngTrim) : null,
+      };
+    }
 
     const pr = toFloatOrNull(price);
     if (pr !== null) body.price = pr;
@@ -240,19 +246,18 @@ export function usePropertyForm(existing?: AdminProperty | null, isNew?: boolean
 
     body.listing_no = listingNo.trim() ? listingNo.trim() : null;
     body.badge_text = badgeText.trim() ? badgeText.trim() : null;
-
     body.featured = featured;
 
     body.gross_m2 = toIntOrNull(grossM2);
     body.net_m2 = toIntOrNull(netM2);
 
-    body.rooms = rooms.trim() ? rooms.trim() : null;
+    body.rooms = rooms ? rooms : null;
     body.building_age = buildingAge.trim() ? buildingAge.trim() : null;
 
     body.floor = floor.trim() ? floor.trim() : null;
     body.total_floors = toIntOrNull(totalFloors);
 
-    body.heating = heating.trim() ? heating.trim() : null;
+    body.heating = heating ? heating : null;
 
     body.furnished = furnished;
     body.in_site = inSite;
@@ -264,7 +269,6 @@ export function usePropertyForm(existing?: AdminProperty | null, isNew?: boolean
     body.image_asset_id = imageAssetId ? imageAssetId : null;
     body.alt = alt.trim() ? alt.trim() : null;
 
-    // IMPORTANT: PATCH/UPSERT ikisinde de aynı format
     body.assets = assets.map((x, i) => ({
       id: x.id,
       asset_id: x.asset_id ?? null,
@@ -281,9 +285,6 @@ export function usePropertyForm(existing?: AdminProperty | null, isNew?: boolean
 
   const buildPatchBody = (): PropertyPatchBody => buildUpsertBody() as any;
 
-  // ------------------------------
-  // Gallery ops FIX (returns nextAssets)
-  // ------------------------------
   const setCoverIndex = (idx: number): GalleryAsset[] => {
     let next: GalleryAsset[] = [];
     setAssets((p) => {
@@ -346,31 +347,28 @@ export function usePropertyForm(existing?: AdminProperty | null, isNew?: boolean
       const idx = assetId ? p.findIndex((x) => x.asset_id === assetId) : -1;
 
       if (idx >= 0) {
-  const withCover = ensureSingleCover(p, idx);
+        const withCover = ensureSingleCover(p, idx);
+        const current = withCover[idx];
 
-  const current = withCover[idx];
-  if (!current) {
-    // Teoride olmaz ama TS için ve runtime güvenliği için
-    next = reindex(ensureCoverExists(withCover));
-    return next;
-  }
+        if (!current) {
+          next = reindex(ensureCoverExists(withCover));
+          return next;
+        }
 
-  const updated: GalleryAsset = {
-    ...current, // ✅ artık current kesin GalleryAsset
-    alt: nextAlt || current.alt || null,
-    url: url ?? current.url ?? null,
-    asset_id: assetId ?? current.asset_id ?? null,
-    is_cover: true,
-    // id/kind/display_order zaten current'tan geliyor ve zorunlu alanlar garanti
-  };
+        const updated: GalleryAsset = {
+          ...current,
+          alt: nextAlt || current.alt || null,
+          url: url ?? current.url ?? null,
+          asset_id: assetId ?? current.asset_id ?? null,
+          is_cover: true,
+        };
 
-  const arr = withCover.slice();
-  arr[idx] = updated;
+        const arr = withCover.slice();
+        arr[idx] = updated;
 
-  next = reindex(ensureCoverExists(arr));
-  return next;
-}
-
+        next = reindex(ensureCoverExists(arr));
+        return next;
+      }
 
       const newItem: GalleryAsset = {
         id: makeTmpId(),
@@ -391,79 +389,60 @@ export function usePropertyForm(existing?: AdminProperty | null, isNew?: boolean
   };
 
   return {
+    // options
+    HEATING,
+    ROOMS,
+
     // state
-    title,
-    setTitle,
-    slug,
-    setSlug,
-    autoSlug,
-    setAutoSlug,
-    type,
-    setType,
-    status,
-    setStatus,
-    address,
-    setAddress,
-    city,
-    setCity,
-    district,
-    setDistrict,
-    neighborhood,
-    setNeighborhood,
-    lat,
-    setLat,
-    lng,
-    setLng,
-    description,
-    setDescription,
-    price,
-    setPrice,
-    currency,
-    setCurrency,
-    minPriceAdmin,
-    setMinPriceAdmin,
-    listingNo,
-    setListingNo,
-    badgeText,
-    setBadgeText,
-    featured,
-    setFeatured,
-    grossM2,
-    setGrossM2,
-    netM2,
-    setNetM2,
-    rooms,
-    setRooms,
-    buildingAge,
-    setBuildingAge,
-    floor,
-    setFloor,
-    totalFloors,
-    setTotalFloors,
-    heating,
-    setHeating,
-    furnished,
-    setFurnished,
-    inSite,
-    setInSite,
-    hasBalcony,
-    setHasBalcony,
-    hasParking,
-    setHasParking,
-    hasElevator,
-    setHasElevator,
-    isActive,
-    setIsActive,
-    displayOrder,
-    setDisplayOrder,
-    imageUrl,
-    setImageUrl,
-    imageAssetId,
-    setImageAssetId,
-    alt,
-    setAlt,
-    assets,
-    setAssets,
+    title, setTitle,
+    slug, setSlug,
+    autoSlug, setAutoSlug,
+
+    type, setType,
+    status, setStatus,
+
+    address, setAddress,
+    city, setCity,
+    district, setDistrict,
+    neighborhood, setNeighborhood,
+
+    lat, setLat,
+    lng, setLng,
+
+    description, setDescription,
+
+    price, setPrice,
+    currency, setCurrency,
+    minPriceAdmin, setMinPriceAdmin,
+
+    listingNo, setListingNo,
+    badgeText, setBadgeText,
+    featured, setFeatured,
+
+    grossM2, setGrossM2,
+    netM2, setNetM2,
+
+    rooms, setRooms,
+    buildingAge, setBuildingAge,
+    floor, setFloor,
+    totalFloors, setTotalFloors,
+
+    heating, setHeating,
+
+    furnished, setFurnished,
+    inSite, setInSite,
+    hasBalcony, setHasBalcony,
+    hasParking, setHasParking,
+    hasElevator, setHasElevator,
+
+    isActive, setIsActive,
+    displayOrder, setDisplayOrder,
+
+    imageUrl, setImageUrl,
+    imageAssetId, setImageAssetId,
+    alt, setAlt,
+
+    assets, setAssets,
 
     // actions
     validateRequired,

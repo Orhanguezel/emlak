@@ -14,65 +14,15 @@ import { Button } from "../../ui/button";
 import { Input } from "../../ui/input";
 import { Badge } from "../../ui/badge";
 
-import {
-  useGetPropertyBySlugQuery,
-  useListPropertiesQuery,
-} from "@/integrations/rtk/endpoints/properties.endpoints";
+import { useGetPropertyBySlugQuery, useListPropertiesQuery } from "@/integrations/rtk/endpoints/properties.endpoints";
 import { useListSiteSettingsQuery } from "@/integrations/rtk/endpoints/site_settings.endpoints";
 import { useCreateContactMutation } from "@/integrations/rtk/endpoints/contacts.endpoints";
 
 import type { ContactCreateInput } from "@/integrations/rtk/types/contacts";
-import type {
-  Properties as PropertyView,
-  PropertyAssetPublic,
-} from "@/integrations/rtk/types/properties";
+import type { Properties as PropertyView } from "@/integrations/rtk/types/properties";
+import { getPropertyStatusLabel, getPropertyTypeLabel } from "@/integrations/rtk/types/properties";
 
-// ----------------------------- helpers: response shape normalize -----------------------------
-
-/**
- * RTK endpoint bazen:
- * - doğrudan entity döndürür  => { ...property }
- * - veya wrapper döndürür     => { data: { ...property } } / { item: { ... } } / { property: { ... } }
- */
-function unwrapOne<T = any>(x: unknown): T | null {
-  if (!x || typeof x !== "object") return null;
-  const o = x as any;
-
-  // en yaygın wrapper key’ler
-  const candidate =
-    o.data ??
-    o.item ??
-    o.property ??
-    o.result ??
-    o.payload ??
-    null;
-
-  // candidate yoksa direkt objeyi entity say
-  return (candidate ?? o) as T;
-}
-
-/**
- * list endpoint bazen:
- * - array döndürür => PropertyView[]
- * - wrapper döndürür => { items: PropertyView[], total, ... } / { data: PropertyView[] }
- */
-function unwrapList<T = any>(x: unknown): T[] {
-  if (!x) return [];
-  if (Array.isArray(x)) return x as T[];
-  if (typeof x !== "object") return [];
-  const o = x as any;
-
-  const candidate =
-    o.items ??
-    o.rows ??
-    o.list ??
-    o.data ??
-    o.result ??
-    o.payload ??
-    [];
-
-  return Array.isArray(candidate) ? (candidate as T[]) : [];
-}
+import { toUiProperty, unwrapList, unwrapOne } from "@/components/public/properties/properties.selectors";
 
 // ----------------------------- helpers: site settings -----------------------------
 
@@ -113,121 +63,6 @@ function buildWhatsappHref(raw: string): string {
   return `https://wa.me/${digits}`;
 }
 
-function normalizeStatusLabel(v: string): string {
-  const s = (v || "").toLowerCase();
-  if (s === "sold") return "Satıldı";
-  if (s === "new") return "Yeni";
-  if (s === "in_progress") return "Süreçte";
-  if (s === "satilik") return "Satılık";
-  if (s === "kiralik") return "Kiralık";
-  return v || "Durum";
-}
-
-function normalizeTypeLabel(v: string): string {
-  return v || "Tür";
-}
-
-// ----------------------------- ui mapping (PUBLIC-safe) -----------------------------
-
-const PLACEHOLDER_IMG =
-  "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=1600&q=80";
-
-function safeImage(v: unknown): string {
-  const s = typeof v === "string" ? v.trim() : "";
-  return s.length ? s : PLACEHOLDER_IMG;
-}
-
-function pickImagesFromAssets(assets: PropertyAssetPublic[] | undefined): string[] {
-  if (!Array.isArray(assets) || !assets.length) return [PLACEHOLDER_IMG];
-
-  const images = assets
-    .filter((a) => (a?.kind || "image") === "image")
-    .sort((a, b) => {
-      if (a.is_cover !== b.is_cover) return a.is_cover ? -1 : 1;
-      return (a.display_order ?? 0) - (b.display_order ?? 0);
-    })
-    .map((a) => safeImage(a?.url))
-    .filter(Boolean);
-
-  return images.length ? images : [PLACEHOLDER_IMG];
-}
-
-type UiProperty = {
-  id: string;
-  slug: string;
-  title: string;
-
-  type: string;
-  status: string;
-
-  address: string;
-  district: string;
-  city: string;
-  neighborhood?: string | null;
-
-  description?: string | null;
-
-  price?: string | null;
-  currency?: string | null;
-  rooms?: string | null;
-  gross_m2?: number | null;
-
-  coordinates?: { lat: number; lng: number } | null;
-
-  image: string; // cover
-  images: string[]; // gallery (>=1)
-};
-
-function toUiProperty(pRaw: unknown): UiProperty {
-  const p = (pRaw ?? {}) as any;
-
-  // assets public endpoint’te bazen "assets" gelir, bazen gelmez.
-  const assets = Array.isArray(p.assets) ? (p.assets as PropertyAssetPublic[]) : undefined;
-
-  const imgs = pickImagesFromAssets(assets);
-
-  const cover = safeImage(
-    p.image_effective_url ?? p.image_url ?? p.image ?? imgs[0] ?? PLACEHOLDER_IMG,
-  );
-
-  const lat = Number(p?.coordinates?.lat ?? p?.lat);
-  const lng = Number(p?.coordinates?.lng ?? p?.lng);
-  const coordinates = Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
-
-  const priceNum = p?.price;
-  const price =
-    priceNum == null || priceNum === "" ? null : String(priceNum);
-
-  const gross =
-    p?.gross_m2 == null ? null : (Number.isFinite(Number(p.gross_m2)) ? Number(p.gross_m2) : null);
-
-  return {
-    id: String(p.id ?? ""),
-    slug: String(p.slug ?? ""),
-    title: String(p.title ?? ""),
-
-    type: String(p.type ?? ""),
-    status: String(p.status ?? ""),
-
-    address: String(p.address ?? ""),
-    district: String(p.district ?? ""),
-    city: String(p.city ?? ""),
-    neighborhood: typeof p.neighborhood !== "undefined" ? (p.neighborhood ?? null) : null,
-
-    description: p.description ?? null,
-
-    price,
-    currency: typeof p.currency !== "undefined" ? String(p.currency ?? "TRY") : "TRY",
-    rooms: typeof p.rooms !== "undefined" ? (p.rooms ?? null) : null,
-    gross_m2: gross,
-
-    coordinates,
-
-    images: imgs,
-    image: cover,
-  };
-}
-
 // ----------------------------- props -----------------------------
 
 interface PropertyDetailPageProps {
@@ -264,8 +99,7 @@ export function PropertyDetailPage({ slug, onNavigate, onPropertyDetail }: Prope
   const telHref = buildTelHref(contactPhoneRaw);
   const waHref = settings["contact_whatsapp_link"] || buildWhatsappHref(contactPhoneRaw);
 
-  const { data: detailRaw, isFetching: loadingDetail, isError } =
-    useGetPropertyBySlugQuery(slug, { skip: !slug });
+  const { data: detailRaw, isFetching: loadingDetail, isError } = useGetPropertyBySlugQuery(slug, { skip: !slug });
 
   const property = useMemo(() => {
     const unwrapped = unwrapOne<PropertyView>(detailRaw);
@@ -279,19 +113,16 @@ export function PropertyDetailPage({ slug, onNavigate, onPropertyDetail }: Prope
     if (property && !formData.subject.trim()) {
       setFormData((p) => ({ ...p, subject: `İlan bilgi talebi: ${property.title}`.trim() }));
     }
-  }, [property]); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [property]);
 
   const { data: otherRaw } = useListPropertiesQuery({ active: true, limit: 24, offset: 0 });
 
-  const otherProps: UiProperty[] = useMemo(() => {
+  const otherProps = useMemo(() => {
     const arr = unwrapList<PropertyView>(otherRaw);
-    const mapped = arr.map((x) => toUiProperty(x));
+    const mapped = arr.map(toUiProperty);
 
-    // public: inactive / aynı ilanı ele
-    const filtered = property
-      ? mapped.filter((x) => x.id !== property.id && x.slug !== property.slug)
-      : mapped;
-
+    const filtered = property ? mapped.filter((x) => x.id !== property.id && x.slug !== property.slug) : mapped;
     return filtered.slice(0, 8);
   }, [otherRaw, property]);
 
@@ -317,9 +148,13 @@ export function PropertyDetailPage({ slug, onNavigate, onPropertyDetail }: Prope
     const messageFinal = [
       formData.message.trim(),
       property?.title ? `\n\nİlan: ${property.title}` : "",
-      property?.district || property?.city ? `\nKonum: ${property.district}${property.city ? `, ${property.city}` : ""}` : "",
+      property?.district || property?.city
+        ? `\nKonum: ${property.district}${property.city ? `, ${property.city}` : ""}`
+        : "",
       property?.slug ? `\nSlug: ${property.slug}` : "",
-    ].join("").trim();
+    ]
+      .join("")
+      .trim();
 
     const payload: ContactCreateInput = {
       name: formData.name.trim(),
@@ -342,15 +177,11 @@ export function PropertyDetailPage({ slug, onNavigate, onPropertyDetail }: Prope
         website: "",
       });
     } catch (err: any) {
-      toast.error(
-        typeof err?.data?.error === "string"
-          ? `Hata: ${err.data.error}`
-          : "Mesaj gönderilemedi. Lütfen tekrar deneyin.",
-      );
+      toast.error(typeof err?.data?.error === "string" ? `Hata: ${err.data.error}` : "Mesaj gönderilemedi. Lütfen tekrar deneyin.");
     }
   };
 
-  const goDetail = (p: UiProperty) => {
+  const goDetail = (p: { slug: string }) => {
     const s = (p.slug || "").trim();
     if (!s) return;
     onPropertyDetail?.(s);
@@ -449,10 +280,9 @@ export function PropertyDetailPage({ slug, onNavigate, onPropertyDetail }: Prope
                   <button
                     key={`${property.id}-${idx}`}
                     onClick={() => setCurrentImageIndex(idx)}
-                    className={`aspect-square rounded-lg overflow-hidden border-2 transition-all ${idx === safeIndex
-                        ? "border-slate-900 ring-2 ring-slate-200"
-                        : "border-gray-200 hover:border-gray-300"
-                      }`}
+                    className={`aspect-square rounded-lg overflow-hidden border-2 transition-all ${
+                      idx === safeIndex ? "border-slate-900 ring-2 ring-slate-200" : "border-gray-200 hover:border-gray-300"
+                    }`}
                     type="button"
                   >
                     <ImageWithFallback
@@ -477,21 +307,19 @@ export function PropertyDetailPage({ slug, onNavigate, onPropertyDetail }: Prope
                 <Badge className="bg-slate-900 text-white hover:bg-slate-800">
                   <span className="inline-flex items-center gap-1">
                     <HomeIcon className="w-3.5 h-3.5" />
-                    {normalizeTypeLabel(property.type)}
+                    {getPropertyTypeLabel(property.type)}
                   </span>
                 </Badge>
 
                 <Badge variant="outline" className="border-slate-900 text-slate-900 font-semibold">
                   <span className="inline-flex items-center gap-1">
                     <BadgeCheck className="w-3.5 h-3.5" />
-                    {normalizeStatusLabel(property.status)}
+                    {getPropertyStatusLabel(property.status)}
                   </span>
                 </Badge>
               </div>
 
-              <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-3 leading-tight">
-                {property.title}
-              </h1>
+              <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-3 leading-tight">{property.title}</h1>
 
               <div className="flex items-start gap-2 text-gray-700">
                 <MapPin className="w-5 h-5 mt-0.5 text-gray-500" />
@@ -506,7 +334,6 @@ export function PropertyDetailPage({ slug, onNavigate, onPropertyDetail }: Prope
                 </div>
               </div>
 
-              {/* Public-friendly kısa özet */}
               {(property.price || property.rooms || typeof property.gross_m2 === "number") && (
                 <div className="mt-4 flex flex-wrap gap-2 text-xs">
                   {property.price && (
@@ -515,14 +342,10 @@ export function PropertyDetailPage({ slug, onNavigate, onPropertyDetail }: Prope
                     </span>
                   )}
                   {property.rooms && (
-                    <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-800 font-semibold">
-                      {property.rooms}
-                    </span>
+                    <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-800 font-semibold">{property.rooms}</span>
                   )}
                   {typeof property.gross_m2 === "number" && (
-                    <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-800 font-semibold">
-                      {property.gross_m2} m²
-                    </span>
+                    <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-800 font-semibold">{property.gross_m2} m²</span>
                   )}
                 </div>
               )}
@@ -535,23 +358,6 @@ export function PropertyDetailPage({ slug, onNavigate, onPropertyDetail }: Prope
               </p>
             </div>
 
-            {property.coordinates?.lat != null && property.coordinates?.lng != null && (
-              <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-                <div className="text-sm text-gray-600 mb-2">Haritada Gör</div>
-                <Button
-                  variant="outline"
-                  className="border-slate-900 text-slate-900 hover:bg-slate-900 hover:text-white"
-                  onClick={() => {
-                    const { lat, lng } = property.coordinates!;
-                    window.open(`https://www.google.com/maps?q=${lat},${lng}`, "_blank");
-                  }}
-                >
-                  Google Maps Aç
-                </Button>
-              </div>
-            )}
-
-            {/* Contact quick actions */}
             <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
               <div className="text-sm text-gray-600 mb-2">Hızlı İletişim</div>
               <div className="flex flex-wrap gap-2">
@@ -572,7 +378,6 @@ export function PropertyDetailPage({ slug, onNavigate, onPropertyDetail }: Prope
               </div>
             </div>
 
-            {/* Contact form */}
             <div className="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
               <div className="text-lg font-bold text-slate-900 mb-4">Bilgi Talep Formu</div>
               <form onSubmit={onSubmit} className="space-y-3">
@@ -592,11 +397,7 @@ export function PropertyDetailPage({ slug, onNavigate, onPropertyDetail }: Prope
                   placeholder="Mesajınız *"
                   className="min-h-[120px] w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm"
                 />
-                <Button
-                  type="submit"
-                  disabled={!canSubmit || contactSaving}
-                  className="bg-slate-900 hover:bg-slate-800 text-white w-full"
-                >
+                <Button type="submit" disabled={!canSubmit || contactSaving} className="bg-slate-900 hover:bg-slate-800 text-white w-full">
                   {contactSaving ? "Gönderiliyor..." : "Gönder"}
                 </Button>
               </form>
@@ -604,7 +405,6 @@ export function PropertyDetailPage({ slug, onNavigate, onPropertyDetail }: Prope
           </div>
         </div>
 
-        {/* Diğer ilanlar */}
         {otherProps.length > 0 && (
           <div className="mt-12">
             <h3 className="text-2xl font-bold text-slate-900 mb-5">Benzer İlanlar</h3>

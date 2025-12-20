@@ -1,5 +1,10 @@
-// src/components/public/properties/properties.selectors.ts
-import type { Properties as PropertyView, PropertyAssetPublic } from "@/integrations/rtk/types/properties";
+// =============================================================
+// FILE: src/components/public/properties/properties.selectors.ts
+// =============================================================
+import type {
+  Properties as PropertyView,
+  PropertyAssetPublic,
+} from "@/integrations/rtk/types/properties";
 
 const PLACEHOLDER_IMG =
   "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=1200&q=80";
@@ -36,7 +41,6 @@ export type UiProperty = {
 
 /**
  * API bazen listeyi direkt [] döndürür, bazen {items:[]} / {rows:[]} gibi wrapper döndürür.
- * Bu helper ikisini de çözer.
  */
 export function unwrapList<T = any>(x: unknown): T[] {
   if (!x) return [];
@@ -44,16 +48,20 @@ export function unwrapList<T = any>(x: unknown): T[] {
   if (typeof x !== "object") return [];
   const o = x as any;
 
-  const candidate =
-    o.items ??
-    o.rows ??
-    o.list ??
-    o.data ??
-    o.result ??
-    o.payload ??
-    [];
-
+  const candidate = o.items ?? o.rows ?? o.list ?? o.data ?? o.result ?? o.payload ?? [];
   return Array.isArray(candidate) ? (candidate as T[]) : [];
+}
+
+/**
+ * RTK endpoint bazen:
+ * - doğrudan entity döndürür  => { ...property }
+ * - veya wrapper döndürür     => { data: { ... } } / { item: { ... } } / { property: { ... } }
+ */
+export function unwrapOne<T = any>(x: unknown): T | null {
+  if (!x || typeof x !== "object") return null;
+  const o = x as any;
+  const candidate = o.data ?? o.item ?? o.property ?? o.result ?? o.payload ?? null;
+  return (candidate ?? o) as T;
 }
 
 export function toSelectOptions(arr: unknown): string[] {
@@ -98,9 +106,7 @@ function pickImagesFromAssets(assets: PropertyAssetPublic[] | undefined): string
 export function toUiProperty(p: PropertyView): UiProperty {
   const anyP = p as any;
 
-  const assets = Array.isArray(anyP.assets)
-    ? (anyP.assets as PropertyAssetPublic[])
-    : undefined;
+  const assets = Array.isArray(anyP.assets) ? (anyP.assets as PropertyAssetPublic[]) : undefined;
 
   const imagesFromAssets = pickImagesFromAssets(assets);
 
@@ -132,15 +138,8 @@ export function toUiProperty(p: PropertyView): UiProperty {
 
     description: anyP.description ?? null,
 
-    // RTK bazen number döndürür; UI tarafı string kullansın
-    price:
-      typeof anyP.price !== "undefined" && anyP.price !== null
-        ? String(anyP.price)
-        : null,
-    currency:
-      typeof anyP.currency !== "undefined" && anyP.currency !== null
-        ? String(anyP.currency)
-        : "TRY",
+    price: typeof anyP.price !== "undefined" && anyP.price !== null ? String(anyP.price) : null,
+    currency: typeof anyP.currency !== "undefined" && anyP.currency !== null ? String(anyP.currency) : "TRY",
 
     rooms: typeof anyP.rooms !== "undefined" ? (anyP.rooms ?? null) : null,
     rooms_multi,
@@ -156,18 +155,4 @@ export function toUiProperty(p: PropertyView): UiProperty {
     image: cover,
     images: imagesFromAssets,
   };
-}
-
-export function normalizeStatusLabel(v: string): string {
-  const s = (v || "").toLowerCase();
-  if (s === "sold") return "Satıldı";
-  if (s === "new") return "Yeni";
-  if (s === "in_progress") return "Süreçte";
-  if (s === "satilik") return "Satılık";
-  if (s === "kiralik") return "Kiralık";
-  return v || "Durum";
-}
-
-export function normalizeTypeLabel(v: string): string {
-  return v || "Tür";
 }

@@ -1,3 +1,6 @@
+// =============================================================
+// FILE: src/components/public/properties/PropertiesFiltersPanel.tsx
+// =============================================================
 "use client";
 
 import * as React from "react";
@@ -9,13 +12,23 @@ import { Switch } from "../../ui/switch";
 import { Label } from "../../ui/label";
 
 import type { Filters } from "./usePropertiesFilters";
-import {
-  normalizeStatusLabel,
-  normalizeTypeLabel,
-} from "./properties.selectors";
+import type {
+  Rooms,
+  Heating,
+  UsageStatus,
+  PropertyType,
+  PropertyStatus,
+} from "@/integrations/rtk/types/properties";
 
-import type { Rooms, Heating, UsageStatus } from "@/integrations/rtk/types/properties";
-import { ROOMS, HEATING, USAGE_STATUS } from "@/integrations/rtk/types/properties";
+import {
+  ROOMS,
+  HEATING,
+  USAGE_STATUS,
+  getPropertyTypeLabel,
+  getPropertyStatusLabel,
+  getHeatingLabel,
+  getUsageStatusLabel,
+} from "@/integrations/rtk/types/properties";
 
 // ----------------------------- local helpers -----------------------------
 
@@ -39,8 +52,6 @@ function Chip(props: { active: boolean; label: string; onClick: () => void }) {
     </button>
   );
 }
-
-// ----------------------------- component -----------------------------
 
 export function PropertiesFiltersPanel(props: {
   filters: Filters;
@@ -125,26 +136,30 @@ export function PropertiesFiltersPanel(props: {
 
         <select
           value={filters.type}
-          onChange={(e) => setFilters((p) => ({ ...p, type: e.target.value }))}
+          onChange={(e) =>
+            setFilters((p) => ({ ...p, type: e.target.value as PropertyType | "" }))
+          }
           className="h-10 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-800"
         >
           <option value="">Tür</option>
           {options.types.map((t) => (
             <option key={t} value={t}>
-              {normalizeTypeLabel(t)}
+              {getPropertyTypeLabel(t)}
             </option>
           ))}
         </select>
 
         <select
           value={filters.status}
-          onChange={(e) => setFilters((p) => ({ ...p, status: e.target.value }))}
+          onChange={(e) =>
+            setFilters((p) => ({ ...p, status: e.target.value as PropertyStatus | "" }))
+          }
           className="h-10 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-800"
         >
           <option value="">Durum</option>
           {options.statuses.map((s) => (
             <option key={s} value={s}>
-              {normalizeStatusLabel(s)}
+              {getPropertyStatusLabel(s)}
             </option>
           ))}
         </select>
@@ -153,7 +168,7 @@ export function PropertiesFiltersPanel(props: {
       {/* Advanced */}
       {showAdvanced && (
         <div className="mt-5 border-t border-gray-100 pt-5 space-y-4">
-          {/* Row 1: neighborhood + price + m2 */}
+          {/* Row 1 */}
           <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
             <select
               value={filters.neighborhood}
@@ -195,7 +210,7 @@ export function PropertiesFiltersPanel(props: {
             />
           </div>
 
-          {/* Row 2: rooms single + bedrooms + building age */}
+          {/* Row 2 */}
           <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
             <select
               value={filters.rooms}
@@ -257,17 +272,19 @@ export function PropertiesFiltersPanel(props: {
             </div>
           </div>
 
-          {/* Row 3: heating single + usage single */}
+          {/* Row 3 */}
           <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
             <select
               value={filters.heating}
-              onChange={(e) => setFilters((p) => ({ ...p, heating: e.target.value as Heating | "" }))}
+              onChange={(e) =>
+                setFilters((p) => ({ ...p, heating: e.target.value as Heating | "" }))
+              }
               className="h-10 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-800 md:col-span-3"
             >
               <option value="">Isıtma (tek seçim)</option>
               {HEATING.map((h) => (
                 <option key={h} value={h}>
-                  {h}
+                  {getHeatingLabel(h)}
                 </option>
               ))}
             </select>
@@ -282,7 +299,7 @@ export function PropertiesFiltersPanel(props: {
               <option value="">Kullanım (tek seçim)</option>
               {USAGE_STATUS.map((u) => (
                 <option key={u} value={u}>
-                  {u}
+                  {getUsageStatusLabel(u)}
                 </option>
               ))}
             </select>
@@ -296,7 +313,7 @@ export function PropertiesFiltersPanel(props: {
                 {HEATING.map((h) => (
                   <Chip
                     key={h}
-                    label={h}
+                    label={getHeatingLabel(h)}
                     active={filters.heating_multi.includes(h)}
                     onClick={() =>
                       setFilters((p) => ({ ...p, heating_multi: toggleMulti(p.heating_multi, h) }))
@@ -321,7 +338,7 @@ export function PropertiesFiltersPanel(props: {
                 {USAGE_STATUS.map((u) => (
                   <Chip
                     key={u}
-                    label={u}
+                    label={getUsageStatusLabel(u)}
                     active={filters.usage_status_multi.includes(u)}
                     onClick={() =>
                       setFilters((p) => ({
@@ -367,7 +384,9 @@ export function PropertiesFiltersPanel(props: {
                 <Label className="text-sm text-slate-900">{label}</Label>
                 <Switch
                   checked={(filters as any)[k]}
-                  onCheckedChange={(v) => setFilters((p) => ({ ...p, [k]: Boolean(v) } as any))}
+                  onCheckedChange={(v) =>
+                    setFilters((p) => ({ ...p, [k]: Boolean(v) } as any))
+                  }
                 />
               </div>
             ))}

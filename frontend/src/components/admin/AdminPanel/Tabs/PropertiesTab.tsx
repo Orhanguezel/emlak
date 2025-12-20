@@ -1,9 +1,3 @@
-// =============================================================
-// FILE: src/components/admin/AdminPanel/Tabs/PropertiesTab.tsx
-// Admin Properties List (filters + pagination + table + row actions)
-// - Filters UI reused from public: PropertiesFiltersPanel
-// - Query params builder: useAdminPropertiesFilters (admin-specific)
-// =============================================================
 "use client";
 
 import * as React from "react";
@@ -21,12 +15,18 @@ import {
   useUpdatePropertyAdminMutation,
 } from "@/integrations/rtk/endpoints/admin/properties_admin.endpoints";
 
+
+// ✅ TİPLER TEK KAYNAK: types/properties.ts
 import type {
   AdminListParams,
-  PropertyUpsertBody,
-} from "@/integrations/rtk/endpoints/admin/properties_admin.endpoints";
+  PropertyPatchBody,
+  AdminProperty as PropertyAdminView,
+} from "@/integrations/rtk/types/properties";
 
-import type { AdminProperty as PropertyAdminView } from "@/integrations/rtk/types/properties";
+import {
+  getPropertyTypeLabel,
+  getPropertyStatusLabel,
+} from "@/integrations/rtk/types/properties";
 
 import { Plus, Pencil, Trash2, RefreshCw, Image as ImageIcon } from "lucide-react";
 
@@ -82,7 +82,6 @@ export default function PropertiesTab() {
     setOnlyActive,
   } = useAdminPropertiesFilters({ limit, offset });
 
-  // Filtre değişince sayfayı sıfırla (admin pagination tutarlılığı)
   React.useEffect(() => {
     setPage(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -122,7 +121,6 @@ export default function PropertiesTab() {
   ]);
 
   const queryArgs = useMemo<AdminListParams>(() => {
-    // exactOptionalPropertyTypes: undefined alan eklemiyoruz; hook zaten sadece gerekenleri koyuyor
     return queryParams as AdminListParams;
   }, [queryParams]);
 
@@ -138,12 +136,12 @@ export default function PropertiesTab() {
   React.useEffect(() => {
     const list = unwrapList<PropertyAdminView>(data);
     setRows(
-      list.map((p: PropertyAdminView) => ({
+      list.map((p) => ({
         id: p.id,
         title: p.title,
         slug: p.slug,
-        type: p.type,
-        status: p.status,
+        type: String(p.type ?? ""),
+        status: String(p.status ?? ""),
         city: p.city,
         district: p.district,
         neighborhood: (p as any).neighborhood ?? null,
@@ -157,16 +155,12 @@ export default function PropertiesTab() {
     );
   }, [data]);
 
-  // Options (admin filtre select’leri için)
-  // Not: Bu liste sadece "mevcut sayfadaki veriden" türetilir.
-  // Eğer global options istiyorsan admin meta endpoint ile üretmek daha doğru.
   const options = useMemo(() => {
     const cities = uniqStrings(rows.map((r) => r.city));
     const districts = uniqStrings(rows.map((r) => r.district));
     const neighborhoods = uniqStrings(rows.map((r) => r.neighborhood || "").filter(Boolean));
     const types = uniqStrings(rows.map((r) => r.type));
     const statuses = uniqStrings(rows.map((r) => r.status));
-
     return { cities, districts, neighborhoods, types, statuses };
   }, [rows]);
 
@@ -187,7 +181,8 @@ export default function PropertiesTab() {
   const toggleActive = async (p: LocalRow, v: boolean) => {
     setRows((arr) => arr.map((x) => (x.id === p.id ? { ...x, is_active: v } : x)));
 
-    const patch: Partial<PropertyUpsertBody> = { is_active: v };
+    // ✅ doğru patch tipi
+    const patch: PropertyPatchBody = { is_active: v };
 
     try {
       await patchOne({ id: p.id, patch }).unwrap();
@@ -211,7 +206,6 @@ export default function PropertiesTab() {
 
   return (
     <div className="space-y-4">
-      {/* Filters (reused from public) */}
       <div className="space-y-3">
         <PropertiesFiltersPanel
           filters={filters}
@@ -222,7 +216,6 @@ export default function PropertiesTab() {
           options={options}
         />
 
-        {/* Admin-only toggle row (active) + actions */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <Label className="text-sm">Yalnızca Aktif</Label>
@@ -246,7 +239,6 @@ export default function PropertiesTab() {
         </div>
       </div>
 
-      {/* Table */}
       <div className="overflow-x-auto rounded-md border">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-gray-600">
@@ -264,6 +256,8 @@ export default function PropertiesTab() {
           <tbody>
             {rows.map((r) => {
               const thumb = pickThumb(r);
+              const typeLabel = getPropertyTypeLabel(r.type);
+              const statusLabel = getPropertyStatusLabel(r.status);
 
               return (
                 <tr key={r.id} className="border-t">
@@ -271,7 +265,6 @@ export default function PropertiesTab() {
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-14 rounded border bg-white overflow-hidden flex items-center justify-center">
                         {thumb ? (
-                          // eslint-disable-next-line @next/next/no-img-element
                           <img src={thumb} alt="" className="h-full w-full object-cover" />
                         ) : (
                           <ImageIcon className="h-4 w-4 text-gray-400" />
@@ -291,8 +284,8 @@ export default function PropertiesTab() {
                   </td>
 
                   <td className="px-3 py-2">
-                    <div className="text-gray-900">{r.type}</div>
-                    <div className="text-xs text-gray-500">{r.status}</div>
+                    <div className="text-gray-900">{typeLabel}</div>
+                    <div className="text-xs text-gray-500">{statusLabel}</div>
                   </td>
 
                   <td className="px-3 py-2">{formatPrice(r.price, r.currency)}</td>
@@ -307,7 +300,7 @@ export default function PropertiesTab() {
                   </td>
 
                   <td className="px-3 py-2">
-                    {r.updated_at ? new Date(r.updated_at).toLocaleString() : "—"}
+                    {r.updated_at ? new Date(r.updated_at).toLocaleString("tr-TR") : "—"}
                   </td>
 
                   <td className="px-3 py-2 text-right">
@@ -351,11 +344,8 @@ export default function PropertiesTab() {
         </table>
       </div>
 
-      {/* Pagination */}
       <div className="flex items-center justify-between gap-2">
-        <div className="text-xs text-gray-500">
-          {isFetching ? "Yükleniyor…" : `Sayfa: ${page + 1}`}
-        </div>
+        <div className="text-xs text-gray-500">{isFetching ? "Yükleniyor…" : `Sayfa: ${page + 1}`}</div>
         <div className="flex gap-2">
           <Button
             type="button"

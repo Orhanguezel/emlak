@@ -17,6 +17,12 @@ import {
   useUpdatePropertyAdminMutation,
 } from "@/integrations/rtk/endpoints/admin/properties_admin.endpoints";
 
+// ✅ meta endpoints (public)
+import {
+  useListPropertyTypesQuery,
+  useListPropertyStatusesQuery,
+} from "@/integrations/rtk/endpoints/properties.endpoints";
+
 import { extractUploadResult } from "@/components/admin/AdminPanel/form/properties/helpers";
 import { usePropertyForm } from "@/components/admin/AdminPanel/form/properties/usePropertyForm";
 
@@ -35,6 +41,9 @@ type UploadedLike = {
   mime?: string | null;
 };
 
+const uniq = (arr: string[]): string[] =>
+  Array.from(new Set(arr.map((x) => x.trim()).filter(Boolean)));
+
 export default function PropertyFormPage() {
   const nav = useNavigate();
   const { id } = useParams() as { id?: string };
@@ -43,6 +52,19 @@ export default function PropertyFormPage() {
   const { data: existing, isFetching: loadingExisting } = useGetPropertyAdminQuery(
     String(id ?? ""),
     { skip: isNew },
+  );
+
+  // ✅ meta options
+  const { data: typeOptionsRaw = [] } = useListPropertyTypesQuery();
+  const { data: statusOptionsRaw = [] } = useListPropertyStatusesQuery();
+
+  const typeOptions = React.useMemo(
+    () => uniq(Array.isArray(typeOptionsRaw) ? typeOptionsRaw : []),
+    [typeOptionsRaw],
+  );
+  const statusOptions = React.useMemo(
+    () => uniq(Array.isArray(statusOptionsRaw) ? statusOptionsRaw : []),
+    [statusOptionsRaw],
   );
 
   const form = usePropertyForm(existing ?? null, isNew);
@@ -91,7 +113,6 @@ export default function PropertyFormPage() {
     }
   };
 
-  // Cover upload
   const uploadCover = async (file: File): Promise<void> => {
     if (isNew || !id) {
       toast.error("Önce kaydı oluşturun, sonra kapak görseli ekleyin.");
@@ -170,7 +191,6 @@ export default function PropertyFormPage() {
     }
   };
 
-  // Gallery multi upload
   const uploadGalleryFiles = async (files: FileList): Promise<void> => {
     if (isNew || !id) {
       toast.error("Önce kaydı oluşturun, sonra galeri ekleyin.");
@@ -190,13 +210,10 @@ export default function PropertyFormPage() {
 
       const anyRes = res as any;
       const rawItems = anyRes?.items ?? anyRes?.data?.items ?? anyRes?.result?.items ?? [];
-      const normalized = (Array.isArray(rawItems) ? rawItems : [rawItems])
-        .flat()
-        .filter(Boolean);
+      const normalized = (Array.isArray(rawItems) ? rawItems : [rawItems]).flat().filter(Boolean);
 
       const mapped: UploadedLike[] = normalized.map((it: any) => {
         const asset_id = (it?.id ?? it?.asset_id ?? it?.assetId ?? null) as string | null;
-
         const url =
           (it?.url ?? it?.public_url ?? it?.publicUrl ?? it?.cdn_url ?? null) as string | null;
 
@@ -212,11 +229,7 @@ export default function PropertyFormPage() {
 
       const nextAssets = form.addUploadedAssets(mapped);
 
-      await updateOne({
-        id: String(id),
-        patch: { assets: nextAssets as any },
-      }).unwrap();
-
+      await updateOne({ id: String(id), patch: { assets: nextAssets as any } }).unwrap();
       toast.success("Galeri güncellendi");
     } catch (e: any) {
       toast.error(e?.data?.error?.message || e?.data?.message || "Galeri yüklenemedi");
@@ -228,12 +241,7 @@ export default function PropertyFormPage() {
 
     try {
       const nextAssets = form.setCoverIndex(idx);
-
-      await updateOne({
-        id: String(id),
-        patch: { assets: nextAssets as any },
-      }).unwrap();
-
+      await updateOne({ id: String(id), patch: { assets: nextAssets as any } }).unwrap();
       toast.success("Kapak (galeriden) güncellendi");
     } catch (e: any) {
       toast.error(e?.data?.message || "Kapak güncellenemedi");
@@ -245,12 +253,7 @@ export default function PropertyFormPage() {
 
     try {
       const nextAssets = form.removeAssetAt(idx);
-
-      await updateOne({
-        id: String(id),
-        patch: { assets: nextAssets as any },
-      }).unwrap();
-
+      await updateOne({ id: String(id), patch: { assets: nextAssets as any } }).unwrap();
       toast.success("Medya kaldırıldı");
     } catch (e: any) {
       toast.error(e?.data?.message || "Medya kaldırılamadı");
@@ -300,6 +303,8 @@ export default function PropertyFormPage() {
         setType={form.setType}
         status={form.status}
         setStatus={form.setStatus}
+        typeOptions={typeOptions}
+        statusOptions={statusOptions}
         address={form.address}
         setAddress={form.setAddress}
         city={form.city}
@@ -336,6 +341,7 @@ export default function PropertyFormPage() {
         setNetM2={form.setNetM2}
         rooms={form.rooms}
         setRooms={form.setRooms}
+        roomsOptions={form.ROOMS}
         buildingAge={form.buildingAge}
         setBuildingAge={form.setBuildingAge}
         floor={form.floor}
@@ -344,6 +350,7 @@ export default function PropertyFormPage() {
         setTotalFloors={form.setTotalFloors}
         heating={form.heating}
         setHeating={form.setHeating}
+        heatingOptions={form.HEATING}
         furnished={form.furnished}
         setFurnished={form.setFurnished}
         inSite={form.inSite}
@@ -356,7 +363,12 @@ export default function PropertyFormPage() {
         setHasElevator={form.setHasElevator}
       />
 
-      <PropertyMapSection lat={form.lat} setLat={form.setLat} lng={form.lng} setLng={form.setLng} />
+      <PropertyMapSection
+        lat={form.lat}
+        setLat={form.setLat}
+        lng={form.lng}
+        setLng={form.setLng}
+      />
 
       <PropertyDescriptionSection
         description={form.description}
