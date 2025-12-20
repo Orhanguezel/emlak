@@ -2,8 +2,7 @@
 -- FILE: 20_properties_schema.sql
 -- Properties + Property Assets (Sahibinden benzeri alanlar)
 -- FINAL: enum + multi-select JSON kolonları + asset galerisi
--- Drizzle schema ile birebir uyumlu:
---   src/modules/properties/schema.ts (FINAL)
+-- Drizzle schema ile uyumlu (lat/lng esnek: NULL olabilir)
 -- =============================================================
 
 SET NAMES utf8mb4;
@@ -29,9 +28,9 @@ CREATE TABLE IF NOT EXISTS `properties` (
   `city`            VARCHAR(255)   NOT NULL,
   `neighborhood`    VARCHAR(255)   DEFAULT NULL,
 
-  -- Koordinatlar
-  `lat`             DECIMAL(10,6)  NOT NULL,
-  `lng`             DECIMAL(10,6)  NOT NULL,
+  -- Koordinatlar (✅ artık opsiyonel: FE boş gönderebilir)
+  `lat`             DECIMAL(10,6)  DEFAULT NULL,
+  `lng`             DECIMAL(10,6)  DEFAULT NULL,
 
   -- Metin
   `description`     TEXT           DEFAULT NULL,

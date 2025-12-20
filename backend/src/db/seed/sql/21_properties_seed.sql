@@ -1,7 +1,6 @@
 -- =============================================================
 -- FILE: 21_properties_seed.sql
 -- Seed for properties + property_assets (FINAL schema compatible)
--- Added:
 -- - created_at / updated_at set explicitly for "kaç gündür yayında" testi
 -- =============================================================
 

@@ -1,16 +1,19 @@
-// src/components/public/properties/usePropertiesFilters.ts
+// =============================================================
+// FILE: src/components/public/properties/usePropertiesFilters.ts
+// =============================================================
 "use client";
 
 import { useMemo, useState } from "react";
-import type { Rooms, Heating, UsageStatus } from "@/integrations/rtk/types/properties";
+import type { Rooms, Heating, UsageStatus, PropertyType, PropertyStatus } from "@/integrations/rtk/types/properties";
 
 export type Filters = {
   search: string;
   city: string;
   district: string;
   neighborhood: string;
-  type: string;
-  status: string;
+
+  type: PropertyType | "";
+  status: PropertyStatus | "";
 
   price_min: string;
   price_max: string;
@@ -107,17 +110,16 @@ export function usePropertiesFilters(args: { showSearchResults: boolean; searchT
       return q;
     }
 
-    // base
     if (filters.search.trim()) q.search = filters.search.trim();
     if (filters.city) q.city = filters.city;
     if (filters.district) q.district = filters.district;
     if (filters.neighborhood) q.neighborhood = filters.neighborhood;
+
     if (filters.type) q.type = filters.type;
     if (filters.status) q.status = filters.status;
 
     if (filters.featured) q.featured = true;
 
-    // ranges
     const priceMin = toNumOrUndef(filters.price_min);
     const priceMax = toNumOrUndef(filters.price_max);
     if (priceMin !== undefined) q.price_min = priceMin;
@@ -128,7 +130,6 @@ export function usePropertiesFilters(args: { showSearchResults: boolean; searchT
     if (gm2Min !== undefined) q.gross_m2_min = Math.trunc(gm2Min);
     if (gm2Max !== undefined) q.gross_m2_max = Math.trunc(gm2Max);
 
-    // rooms: single + multi
     if (filters.rooms) q.rooms = filters.rooms;
     if (filters.rooms_multi.length) q.rooms_multi = filters.rooms_multi;
 
@@ -139,14 +140,12 @@ export function usePropertiesFilters(args: { showSearchResults: boolean; searchT
 
     if (filters.building_age.trim()) q.building_age = filters.building_age.trim();
 
-    // heating/usage: single + multi
     if (filters.heating) q.heating = filters.heating;
     if (filters.heating_multi.length) q.heating_multi = filters.heating_multi;
 
     if (filters.usage_status) q.usage_status = filters.usage_status;
     if (filters.usage_status_multi.length) q.usage_status_multi = filters.usage_status_multi;
 
-    // bool toggles (only send when true)
     const pushTrue = (key: string, v: boolean) => {
       if (v) q[key] = true;
     };

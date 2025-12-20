@@ -7,6 +7,22 @@ import { Switch } from "@/components/ui/switch";
 import { Section } from "@/components/admin/AdminPanel/form/sections/shared/Section";
 import { RequiredMark } from "@/components/admin/AdminPanel/form/properties/RequiredMark";
 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+import { PROPERTY_TYPES, PROPERTY_STATUSES } from "@/integrations/rtk/types/properties";
+
+import {
+  buildEnumOptionsTr,
+  normalizeEnumValueTr,
+  selectValueProps,
+} from "@/components/admin/AdminPanel/form/properties/helpers";
+
 type Props = {
   title: string; setTitle: (v: string) => void;
   slug: string; setSlug: (v: string) => void;
@@ -15,12 +31,14 @@ type Props = {
   type: string; setType: (v: string) => void;
   status: string; setStatus: (v: string) => void;
 
+  typeOptions?: string[];
+  statusOptions?: string[];
+
   address: string; setAddress: (v: string) => void;
   city: string; setCity: (v: string) => void;
   district: string; setDistrict: (v: string) => void;
   neighborhood: string; setNeighborhood: (v: string) => void;
 
-  /** İlanın oluşturulma/yayına çıkış tarihi (ISO string veya Date). */
   listedAt?: string | Date | null;
 };
 
@@ -32,7 +50,6 @@ const parseDateSafe = (v: Props["listedAt"]): Date | null => {
 
 const startOfDay = (d: Date): Date => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 
-/** Saat farkından etkilenmesin diye takvim gününe göre hesaplar */
 const daysSinceCalendar = (date: Date): number => {
   const a = startOfDay(date).getTime();
   const b = startOfDay(new Date()).getTime();
@@ -42,11 +59,7 @@ const daysSinceCalendar = (date: Date): number => {
 
 const formatDateTR = (d: Date): string => {
   try {
-    return new Intl.DateTimeFormat("tr-TR", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(d);
+    return new Intl.DateTimeFormat("tr-TR", { year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
   } catch {
     const yyyy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -63,17 +76,31 @@ const formatPublishedTextTR = (days: number): string => {
 
 export function PropertyBasicSection(p: Props) {
   const listedDate = React.useMemo(() => parseDateSafe(p.listedAt), [p.listedAt]);
-  const listedDays = React.useMemo(
-    () => (listedDate ? daysSinceCalendar(listedDate) : null),
-    [listedDate],
+  const listedDays = React.useMemo(() => (listedDate ? daysSinceCalendar(listedDate) : null), [listedDate]);
+
+  // ✅ value’ları normalize edip label’ları TR üret
+  const typeOptions = React.useMemo(
+    () => buildEnumOptionsTr(p.type, p.typeOptions, PROPERTY_TYPES),
+    [p.type, p.typeOptions],
   );
+
+  const statusOptions = React.useMemo(
+    () => buildEnumOptionsTr(p.status, p.statusOptions, PROPERTY_STATUSES),
+    [p.status, p.statusOptions],
+  );
+
+  // mevcut değeri de normalize ederek saklayalım
+  const normalizedType = React.useMemo(() => normalizeEnumValueTr(p.type), [p.type]);
+  const normalizedStatus = React.useMemo(() => normalizeEnumValueTr(p.status), [p.status]);
 
   return (
     <Section title="Temel Bilgiler">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <div className="flex items-start justify-between gap-3">
-            <Label>Başlık<RequiredMark /></Label>
+            <Label>
+              Başlık<RequiredMark />
+            </Label>
 
             {listedDate && listedDays != null ? (
               <div className="text-right text-xs text-gray-500">
@@ -87,16 +114,15 @@ export function PropertyBasicSection(p: Props) {
             ) : null}
           </div>
 
-          <Input
-            value={p.title}
-            onChange={(e) => p.setTitle(e.target.value)}
-            placeholder="Emlak başlığı"
-          />
+          <Input value={p.title} onChange={(e) => p.setTitle(e.target.value)} placeholder="Emlak başlığı" />
         </div>
 
         <div className="space-y-1">
           <div className="flex items-center justify-between">
-            <Label>Slug<RequiredMark /></Label>
+            <Label>
+              Slug<RequiredMark />
+            </Label>
+
             <label className="flex items-center gap-2 text-xs text-gray-500">
               <Switch
                 checked={p.autoSlug}
@@ -118,27 +144,67 @@ export function PropertyBasicSection(p: Props) {
         </div>
 
         <div className="space-y-2">
-          <Label>Tip<RequiredMark /></Label>
-          <Input value={p.type} onChange={(e) => p.setType(e.target.value)} placeholder="örn: Daire" />
+          <Label>
+            Tip<RequiredMark />
+          </Label>
+
+          <Select
+            {...selectValueProps(normalizedType)}
+            onValueChange={(v) => p.setType(normalizeEnumValueTr(v))}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Seçiniz" />
+            </SelectTrigger>
+            <SelectContent>
+              {typeOptions.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="space-y-2">
-          <Label>Durum<RequiredMark /></Label>
-          <Input value={p.status} onChange={(e) => p.setStatus(e.target.value)} placeholder="örn: satilik / kiralik" />
+          <Label>
+            Durum<RequiredMark />
+          </Label>
+
+          <Select
+            {...selectValueProps(normalizedStatus)}
+            onValueChange={(v) => p.setStatus(normalizeEnumValueTr(v))}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Seçiniz" />
+            </SelectTrigger>
+            <SelectContent>
+              {statusOptions.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="space-y-2 sm:col-span-2">
-          <Label>Adres<RequiredMark /></Label>
+          <Label>
+            Adres<RequiredMark />
+          </Label>
           <Input value={p.address} onChange={(e) => p.setAddress(e.target.value)} placeholder="Açık adres" />
         </div>
 
         <div className="space-y-2">
-          <Label>Şehir<RequiredMark /></Label>
+          <Label>
+            Şehir<RequiredMark />
+          </Label>
           <Input value={p.city} onChange={(e) => p.setCity(e.target.value)} placeholder="örn: İstanbul" />
         </div>
 
         <div className="space-y-2">
-          <Label>İlçe<RequiredMark /></Label>
+          <Label>
+            İlçe<RequiredMark />
+          </Label>
           <Input value={p.district} onChange={(e) => p.setDistrict(e.target.value)} placeholder="örn: Kadıköy" />
         </div>
 

@@ -1,3 +1,5 @@
+// src/components/admin/AdminPanel/form/properties/PropertyDescriptionSection.tsx
+
 "use client";
 
 import * as React from "react";

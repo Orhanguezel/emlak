@@ -1,6 +1,10 @@
 // =============================================================
 // FILE: src/modules/properties/validation.ts
 // FINAL: enum + multi-select destekli validation + assets tmp id fix
+//   - numeric alanlar: string -> number coerce
+//   - price/min_price_admin: "" -> undefined, null korunur
+//   - coordinates: create'da optional (boş gelebilir), patch'te partial
+//   - select: query'de dizi destekli (a,b / ?x=a&x=b)
 // =============================================================
 import { z } from "zod";
 
@@ -19,17 +23,33 @@ export const currencySchema = z.string().trim().min(1).max(8).default("TRY");
 const numInt = z.coerce.number().int();
 const num = z.coerce.number();
 
+// "" -> undefined; null korunur; string->number coerce
+const coerceNullableNonNegNumber = z.preprocess((v) => {
+  if (v === "" || typeof v === "undefined") return undefined; // alan hiç gönderilmesin
+  if (v === null) return null;
+  return v;
+}, z.coerce.number().finite().nonnegative().nullable());
+
 // =============================================================
 // ENUMS (Final)
 // =============================================================
 
 // Isıtma enum
-export const HEATING = ["kombi", "merkezi", "klima", "yerden", "soba", "dogalgaz", "isi_pompasi", "yok"] as const;
+export const HEATING = [
+  "kombi",
+  "merkezi",
+  "klima",
+  "yerden",
+  "soba",
+  "dogalgaz",
+  "isi_pompasi",
+  "yok",
+] as const;
 
 // Kullanım durumu enum
 export const USAGE_STATUS = ["bos", "kiracili", "ev_sahibi", "mal_sahibi_oturuyor", "bilinmiyor"] as const;
 
-// Oda enum (istersen genişlet)
+// Oda enum
 export const ROOMS = [
   "1+0",
   "1+1",
@@ -49,7 +69,7 @@ export const ROOMS = [
 ] as const;
 
 // =============================================================
-// Helpers: query array normalize (supports: ?x=a&x=b  OR ?x=a,b  OR single string)
+// Helpers: query array normalize (supports: ?x=a&x=b OR ?x=a,b OR single string)
 // =============================================================
 const toArrayFromQuery = (v: unknown): string[] | undefined => {
   if (v == null) return undefined;
@@ -57,7 +77,6 @@ const toArrayFromQuery = (v: unknown): string[] | undefined => {
   if (typeof v === "string") {
     const s = v.trim();
     if (!s) return undefined;
-    // "a,b,c" -> ["a","b","c"]
     if (s.includes(",")) return s.split(",").map((x) => x.trim()).filter(Boolean);
     return [s];
   }
@@ -67,6 +86,8 @@ const toArrayFromQuery = (v: unknown): string[] | undefined => {
 // =============================================================
 // LIST QUERY (Final) - multi-select destekli
 // =============================================================
+const SELECT_KEYS = ["items", "total", "enums", "meta"] as const;
+
 export const propertyListQuerySchema = z.object({
   order: z.string().optional(),
   sort: z.enum(["created_at", "updated_at", "price", "gross_m2", "net_m2"]).optional(),
@@ -139,7 +160,8 @@ export const propertyListQuerySchema = z.object({
   created_from: z.string().datetime().optional(),
   created_to: z.string().datetime().optional(),
 
-  select: z.string().optional(),
+  // ✅ select: "enums" istenirse response meta ile döner (controller’da)
+  select: z.preprocess(toArrayFromQuery, z.array(z.enum(SELECT_KEYS)).max(10)).optional(),
 });
 
 export type PropertyListQuery = z.infer<typeof propertyListQuerySchema>;
@@ -148,30 +170,30 @@ export type PropertyListQuery = z.infer<typeof propertyListQuerySchema>;
 // ortak: detay alanları (create/update body) - enum + multi alanlar final
 // =============================================================
 const propertyDetailsSchema = z.object({
-  price: z.number().finite().nonnegative().nullable().optional(),
+  price: coerceNullableNonNegNumber.optional(),
   currency: currencySchema.optional(),
-  min_price_admin: z.number().finite().nonnegative().nullable().optional(),
+  min_price_admin: coerceNullableNonNegNumber.optional(),
 
   listing_no: z.string().trim().max(32).nullable().optional(),
   badge_text: z.string().trim().max(40).nullable().optional(),
   featured: boolLike.optional(),
 
-  gross_m2: z.coerce.number().int().min(0).nullable().optional(),
-  net_m2: z.coerce.number().int().min(0).nullable().optional(),
+  gross_m2: z.preprocess((v) => (v === "" ? undefined : v), z.coerce.number().int().min(0).nullable()).optional(),
+  net_m2: z.preprocess((v) => (v === "" ? undefined : v), z.coerce.number().int().min(0).nullable()).optional(),
 
   // legacy tekli + enum
   rooms: z.enum(ROOMS).nullable().optional(),
   // ✅ multi
   rooms_multi: z.array(z.enum(ROOMS)).max(30).nullable().optional(),
 
-  bedrooms: z.coerce.number().int().min(0).max(50).nullable().optional(),
+  bedrooms: z.preprocess((v) => (v === "" ? undefined : v), z.coerce.number().int().min(0).max(50).nullable()).optional(),
 
   building_age: z.string().trim().max(32).nullable().optional(),
 
   floor: z.string().trim().max(32).nullable().optional(),
-  floor_no: z.coerce.number().int().nullable().optional(),
+  floor_no: z.preprocess((v) => (v === "" ? undefined : v), z.coerce.number().int().nullable()).optional(),
 
-  total_floors: z.coerce.number().int().min(0).nullable().optional(),
+  total_floors: z.preprocess((v) => (v === "" ? undefined : v), z.coerce.number().int().min(0).nullable()).optional(),
 
   // legacy tekli + enum
   heating: z.enum(HEATING).nullable().optional(),
@@ -211,16 +233,14 @@ const propertyDetailsSchema = z.object({
 // FIX: tmp_* id accept, DB always generates uuid
 // =============================================================
 const uuid36 = z.string().trim().length(36);
-
 const assetClientIdSchema = z.string().trim().min(1).max(80).optional(); // tmp_... OK
 
 const assetItemSchema = z
   .object({
-    // UI key: tmp_... olabilir, UUID olmak zorunda değil
-    id: assetClientIdSchema,
+    id: assetClientIdSchema, // tmp_* olabilir
 
     asset_id: uuid36.nullable().optional(),
-    url: z.string().trim().min(1).nullable().optional(), // url() yerine min(1): relative/blob vb. patlamasın
+    url: z.string().trim().min(1).nullable().optional(), // relative/blob vb. patlamasın
     alt: z.string().trim().max(255).nullable().optional(),
     kind: z.enum(["image", "video", "plan"]).optional().default("image"),
     mime: z.string().trim().max(100).nullable().optional(),
@@ -236,7 +256,16 @@ const assetItemSchema = z
 
 // =============================================================
 // CREATE / UPSERT body
+//   - coordinates: optional (omitted/null OK)
+//   - if provided: lat & lng must exist together
 // =============================================================
+const coordinatesSchema = z
+  .object({
+    lat: z.coerce.number().finite(),
+    lng: z.coerce.number().finite(),
+  })
+  .strict();
+
 export const upsertPropertyBodySchema = z
   .object({
     title: z.string().min(2).max(255).trim(),
@@ -254,10 +283,8 @@ export const upsertPropertyBodySchema = z
     district: z.string().min(1).max(255).trim(),
     city: z.string().min(1).max(255).trim(),
 
-    coordinates: z.object({
-      lat: z.number().finite(),
-      lng: z.number().finite(),
-    }),
+    // ✅ artık zorunlu değil
+    coordinates: coordinatesSchema.nullable().optional(),
 
     description: z.string().max(5000).nullable().optional(),
 
@@ -284,10 +311,11 @@ export const patchPropertyBodySchema = z
     district: upsertPropertyBodySchema.shape.district.optional(),
     city: upsertPropertyBodySchema.shape.city.optional(),
 
+    // patch: lat/lng tek tek gelebilir; ikisi yoksa da OK
     coordinates: z
       .object({
-        lat: z.number().finite().optional(),
-        lng: z.number().finite().optional(),
+        lat: z.coerce.number().finite().optional(),
+        lng: z.coerce.number().finite().optional(),
       })
       .optional(),
 

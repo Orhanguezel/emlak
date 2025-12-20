@@ -1,4 +1,6 @@
-// src/components/public/properties/FeaturedPropertiesSection.tsx
+// =============================================================
+// FILE: src/components/public/properties/FeaturedPropertiesSection.tsx
+// =============================================================
 "use client";
 
 import { useMemo } from "react";
@@ -8,13 +10,10 @@ import { Button } from "../../ui/button";
 import { ImageOptimized } from "../ImageOptimized";
 
 import { useListPropertiesQuery } from "@/integrations/rtk/endpoints/properties.endpoints";
-import {
-  normalizeStatusLabel,
-  normalizeTypeLabel,
-  toUiProperty,
-  unwrapList,
-} from "./properties.selectors";
+import { toUiProperty, unwrapList } from "./properties.selectors";
+
 import type { Properties as PropertyView } from "@/integrations/rtk/types/properties";
+import { getPropertyStatusLabel, getPropertyTypeLabel } from "@/integrations/rtk/types/properties";
 
 export function FeaturedPropertiesSection(props: { onPropertyDetail: (slug: string) => void }) {
   const { onPropertyDetail } = props;
@@ -63,22 +62,20 @@ export function FeaturedPropertiesSection(props: { onPropertyDetail: (slug: stri
               <div className="absolute top-3 left-3">
                 <span className="inline-flex items-center gap-1 rounded-full bg-slate-900 text-white px-3 py-1 text-xs font-semibold">
                   <BadgeCheck className="w-3.5 h-3.5" />
-                  {normalizeStatusLabel(p.status)}
+                  {getPropertyStatusLabel(p.status)}
                 </span>
               </div>
 
               <div className="absolute top-3 right-3">
                 <span className="inline-flex items-center gap-1 rounded-full bg-white/95 text-slate-900 px-3 py-1 text-xs font-semibold border border-gray-200">
                   <HomeIcon className="w-3.5 h-3.5" />
-                  {normalizeTypeLabel(p.type)}
+                  {getPropertyTypeLabel(p.type)}
                 </span>
               </div>
             </div>
 
             <div className="p-4">
-              <h3 className="text-base md:text-lg font-bold text-slate-900 mb-2 line-clamp-2">
-                {p.title}
-              </h3>
+              <h3 className="text-base md:text-lg font-bold text-slate-900 mb-2 line-clamp-2">{p.title}</h3>
 
               <div className="flex items-start gap-2 text-sm text-gray-700">
                 <MapPin className="w-4 h-4 mt-0.5 text-gray-500" />

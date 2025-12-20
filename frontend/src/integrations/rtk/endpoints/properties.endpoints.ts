@@ -1,92 +1,16 @@
-// -------------------------------------------------------------
+// =============================================================
 // FILE: src/integrations/rtk/endpoints/properties.endpoints.ts
-// -------------------------------------------------------------
+// =============================================================
 import { baseApi } from "../baseApi";
-import type { Properties as PropertyPublicView } from "@/integrations/rtk/types/properties";
-
-type BoolLike = boolean | 0 | 1 | "0" | "1" | "true" | "false";
-
-export type ListParams = {
-  // sorting/paging
-  order?: string;
-  sort?: "created_at" | "updated_at" | "price" | "gross_m2" | "net_m2";
-  orderDir?: "asc" | "desc";
-  limit?: number;
-  offset?: number;
-
-  // base
-  active?: boolean; // FE -> is_active
-  featured?: boolean;
-
-  search?: string; // FE -> q
-  slug?: string;
-
-  district?: string;
-  city?: string;
-  neighborhood?: string;
-
-  type?: string;
-  status?: string;
-
-  // ranges
-  price_min?: number;
-  price_max?: number;
-
-  gross_m2_min?: number;
-  gross_m2_max?: number;
-
-  net_m2_min?: number;
-  net_m2_max?: number;
-
-  // legacy rooms + ✅ multi rooms
-  rooms?: string;
-  rooms_multi?: string[]; // BE preprocess
-
-  bedrooms_min?: number;
-  bedrooms_max?: number;
-
-  building_age?: string;
-
-  // floors
-  floor?: string;
-  floor_no_min?: number;
-  floor_no_max?: number;
-
-  total_floors_min?: number;
-  total_floors_max?: number;
-
-  // legacy heating/usage + ✅ multi
-  heating?: string;
-  heating_multi?: string[];
-  usage_status?: string;
-  usage_status_multi?: string[];
-
-  // bool filters
-  furnished?: BoolLike;
-  in_site?: BoolLike;
-  has_elevator?: BoolLike;
-  has_parking?: BoolLike;
-
-  has_balcony?: BoolLike;
-  has_garden?: BoolLike;
-  has_terrace?: BoolLike;
-
-  credit_eligible?: BoolLike;
-  swap?: BoolLike;
-
-  has_video?: BoolLike;
-  has_clip?: BoolLike;
-  has_virtual_tour?: BoolLike;
-  has_map?: BoolLike;
-  accessible?: BoolLike;
-
-  // date range
-  created_from?: string;
-  created_to?: string;
-
-  // select (ops)
-  select?: string;
-};
+import type {
+  Properties as PropertyPublicView,
+  Coordinates,
+  PropertiesListParams as ListParams,
+  BoolLike,
+  PropertyType,
+  PropertyStatus,
+  
+} from "@/integrations/rtk/types/properties";
 
 const to01 = (v: unknown): 0 | 1 | undefined => {
   if (v === true || v === 1 || v === "1" || v === "true") return 1;
@@ -98,7 +22,6 @@ const buildParams = (q?: ListParams): Record<string, any> => {
   if (!q) return {};
   const out: Record<string, any> = {};
 
-  // sorting/paging
   if (typeof q.order !== "undefined") out.order = q.order;
   if (typeof q.sort !== "undefined") out.sort = q.sort;
   if (typeof q.orderDir !== "undefined") out.orderDir = q.orderDir;
@@ -106,7 +29,6 @@ const buildParams = (q?: ListParams): Record<string, any> => {
   if (typeof q.limit !== "undefined") out.limit = q.limit;
   if (typeof q.offset !== "undefined") out.offset = q.offset;
 
-  // base
   if (typeof q.active !== "undefined") out.is_active = q.active ? 1 : 0;
   if (typeof q.featured !== "undefined") out.featured = q.featured ? 1 : 0;
 
@@ -120,7 +42,6 @@ const buildParams = (q?: ListParams): Record<string, any> => {
   if (typeof q.type !== "undefined") out.type = q.type;
   if (typeof q.status !== "undefined") out.status = q.status;
 
-  // ranges
   if (typeof q.price_min !== "undefined") out.price_min = q.price_min;
   if (typeof q.price_max !== "undefined") out.price_max = q.price_max;
 
@@ -130,7 +51,6 @@ const buildParams = (q?: ListParams): Record<string, any> => {
   if (typeof q.net_m2_min !== "undefined") out.net_m2_min = q.net_m2_min;
   if (typeof q.net_m2_max !== "undefined") out.net_m2_max = q.net_m2_max;
 
-  // rooms
   if (typeof q.rooms !== "undefined") out.rooms = q.rooms;
   if (typeof q.rooms_multi !== "undefined") out.rooms_multi = q.rooms_multi;
 
@@ -139,7 +59,6 @@ const buildParams = (q?: ListParams): Record<string, any> => {
 
   if (typeof q.building_age !== "undefined") out.building_age = q.building_age;
 
-  // floors
   if (typeof q.floor !== "undefined") out.floor = q.floor;
   if (typeof q.floor_no_min !== "undefined") out.floor_no_min = q.floor_no_min;
   if (typeof q.floor_no_max !== "undefined") out.floor_no_max = q.floor_no_max;
@@ -147,17 +66,15 @@ const buildParams = (q?: ListParams): Record<string, any> => {
   if (typeof q.total_floors_min !== "undefined") out.total_floors_min = q.total_floors_min;
   if (typeof q.total_floors_max !== "undefined") out.total_floors_max = q.total_floors_max;
 
-  // heating/usage
   if (typeof q.heating !== "undefined") out.heating = q.heating;
   if (typeof q.heating_multi !== "undefined") out.heating_multi = q.heating_multi;
 
   if (typeof q.usage_status !== "undefined") out.usage_status = q.usage_status;
   if (typeof q.usage_status_multi !== "undefined") out.usage_status_multi = q.usage_status_multi;
 
-  // bool filters (normalize to 0/1 when provided)
   const pushBool = (k: keyof ListParams, outKey: string) => {
     if (typeof q[k] === "undefined") return;
-    const n = to01(q[k]);
+    const n = to01(q[k] as BoolLike);
     if (typeof n !== "undefined") out[outKey] = n;
   };
 
@@ -165,52 +82,85 @@ const buildParams = (q?: ListParams): Record<string, any> => {
   pushBool("in_site", "in_site");
   pushBool("has_elevator", "has_elevator");
   pushBool("has_parking", "has_parking");
-
   pushBool("has_balcony", "has_balcony");
   pushBool("has_garden", "has_garden");
   pushBool("has_terrace", "has_terrace");
-
   pushBool("credit_eligible", "credit_eligible");
   pushBool("swap", "swap");
-
   pushBool("has_video", "has_video");
   pushBool("has_clip", "has_clip");
   pushBool("has_virtual_tour", "has_virtual_tour");
   pushBool("has_map", "has_map");
   pushBool("accessible", "accessible");
 
-  // dates
   if (typeof q.created_from !== "undefined") out.created_from = q.created_from;
   if (typeof q.created_to !== "undefined") out.created_to = q.created_to;
 
-  // select
   if (typeof q.select !== "undefined") out.select = q.select;
 
   return out;
 };
 
+const toNumOrNull = (v: unknown): number | null => {
+  if (v == null) return null;
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  if (typeof v === "string" && v.trim()) {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+};
+
+const normalizeCoordinates = (r: any): Coordinates | null => {
+  const lat = toNumOrNull(r?.coordinates?.lat) ?? toNumOrNull(r?.lat);
+  const lng = toNumOrNull(r?.coordinates?.lng) ?? toNumOrNull(r?.lng);
+  if (lat == null && lng == null) return null;
+  return { lat: lat ?? null, lng: lng ?? null };
+};
+
+const toPublicView = (r: any): PropertyPublicView => ({
+  ...(r as PropertyPublicView),
+  coordinates: normalizeCoordinates(r),
+});
+
 export const propertiesApi = baseApi.injectEndpoints({
   endpoints: (b) => ({
     listProperties: b.query<PropertyPublicView[], ListParams | void>({
       query: (q) => (q ? { url: "/properties", params: buildParams(q) } : "/properties"),
-      providesTags: (_res) => [{ type: "Properties" as const, id: "LIST" }],
+      transformResponse: (res: unknown): PropertyPublicView[] =>
+        Array.isArray(res) ? (res as any[]).map(toPublicView) : [],
+      providesTags: () => [{ type: "Properties" as const, id: "LIST" }],
     }),
 
     getProperty: b.query<PropertyPublicView, string>({
       query: (id) => ({ url: `/properties/${id}` }),
+      transformResponse: (r: unknown) => toPublicView(r as any),
       providesTags: (_res, _e, id) => [{ type: "Properties" as const, id }],
     }),
 
     getPropertyBySlug: b.query<PropertyPublicView, string>({
       query: (slug) => ({ url: `/properties/by-slug/${slug}` }),
+      transformResponse: (r: unknown) => toPublicView(r as any),
       providesTags: (_res, _e, slug) => [{ type: "Properties" as const, id: `slug:${slug}` }],
     }),
 
-    listPropertyDistricts: b.query<string[], void>({ query: () => ({ url: "/properties/_meta/districts" }) }),
-    listPropertyCities: b.query<string[], void>({ query: () => ({ url: "/properties/_meta/cities" }) }),
-    listPropertyNeighborhoods: b.query<string[], void>({ query: () => ({ url: "/properties/_meta/neighborhoods" }) }),
-    listPropertyTypes: b.query<string[], void>({ query: () => ({ url: "/properties/_meta/types" }) }),
-    listPropertyStatuses: b.query<string[], void>({ query: () => ({ url: "/properties/_meta/statuses" }) }),
+    listPropertyDistricts: b.query<string[], void>({
+      query: () => ({ url: "/properties/_meta/districts" }),
+    }),
+    listPropertyCities: b.query<string[], void>({
+      query: () => ({ url: "/properties/_meta/cities" }),
+    }),
+    listPropertyNeighborhoods: b.query<string[], void>({
+      query: () => ({ url: "/properties/_meta/neighborhoods" }),
+    }),
+
+    // ✅ UI enum ile kullanacağız; API yine string döndürebilir
+    listPropertyTypes: b.query<(PropertyType | string)[], void>({
+      query: () => ({ url: "/properties/_meta/types" }),
+    }),
+    listPropertyStatuses: b.query<(PropertyStatus | string)[], void>({
+      query: () => ({ url: "/properties/_meta/statuses" }),
+    }),
   }),
   overrideExisting: true,
 });
