@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+import type { PropertyType, PropertyStatus } from "@/integrations/rtk/types/properties";
 import { PROPERTY_TYPES, PROPERTY_STATUSES } from "@/integrations/rtk/types/properties";
 
 import {
@@ -28,8 +29,8 @@ type Props = {
   slug: string; setSlug: (v: string) => void;
   autoSlug: boolean; setAutoSlug: (v: boolean) => void;
 
-  type: string; setType: (v: string) => void;
-  status: string; setStatus: (v: string) => void;
+  type: PropertyType | ""; setType: (v: PropertyType | "") => void;          // ✅
+  status: PropertyStatus | ""; setStatus: (v: PropertyStatus | "") => void;  // ✅
 
   typeOptions?: string[];
   statusOptions?: string[];
@@ -78,18 +79,16 @@ export function PropertyBasicSection(p: Props) {
   const listedDate = React.useMemo(() => parseDateSafe(p.listedAt), [p.listedAt]);
   const listedDays = React.useMemo(() => (listedDate ? daysSinceCalendar(listedDate) : null), [listedDate]);
 
-  // ✅ value’ları normalize edip label’ları TR üret
   const typeOptions = React.useMemo(
-    () => buildEnumOptionsTr(p.type, p.typeOptions, PROPERTY_TYPES),
+    () => buildEnumOptionsTr(String(p.type ?? ""), p.typeOptions, PROPERTY_TYPES),
     [p.type, p.typeOptions],
   );
 
   const statusOptions = React.useMemo(
-    () => buildEnumOptionsTr(p.status, p.statusOptions, PROPERTY_STATUSES),
+    () => buildEnumOptionsTr(String(p.status ?? ""), p.statusOptions, PROPERTY_STATUSES),
     [p.status, p.statusOptions],
   );
 
-  // mevcut değeri de normalize ederek saklayalım
   const normalizedType = React.useMemo(() => normalizeEnumValueTr(p.type), [p.type]);
   const normalizedStatus = React.useMemo(() => normalizeEnumValueTr(p.status), [p.status]);
 
@@ -150,7 +149,7 @@ export function PropertyBasicSection(p: Props) {
 
           <Select
             {...selectValueProps(normalizedType)}
-            onValueChange={(v) => p.setType(normalizeEnumValueTr(v))}
+            onValueChange={(v) => p.setType(normalizeEnumValueTr(v) as PropertyType)}
           >
             <SelectTrigger>
               <SelectValue placeholder="Seçiniz" />
@@ -172,7 +171,7 @@ export function PropertyBasicSection(p: Props) {
 
           <Select
             {...selectValueProps(normalizedStatus)}
-            onValueChange={(v) => p.setStatus(normalizeEnumValueTr(v))}
+            onValueChange={(v) => p.setStatus(normalizeEnumValueTr(v) as PropertyStatus)}
           >
             <SelectTrigger>
               <SelectValue placeholder="Seçiniz" />

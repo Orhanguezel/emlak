@@ -5,9 +5,17 @@ import * as React from "react";
 import type {
   PropertyUpsertBody,
   PropertyPatchBody,
-} from "@/integrations/rtk/endpoints/admin/properties_admin.endpoints";
+} from "@/integrations/rtk/types/properties";
 
-import type { AdminProperty, PropertyAssetPublic, Heating, Rooms } from "@/integrations/rtk/types/properties";
+import type {
+  AdminProperty,
+  PropertyAssetPublic,
+  Heating,
+  Rooms,
+  PropertyType,
+  PropertyStatus,
+} from "@/integrations/rtk/types/properties";
+
 import { HEATING, ROOMS } from "@/integrations/rtk/types/properties";
 
 import { slugifyTr, toNum, toFloatOrNull, toIntOrNull } from "./helpers";
@@ -96,8 +104,9 @@ export function usePropertyForm(existing?: AdminProperty | null, isNew?: boolean
   const [slug, setSlug] = React.useState("");
   const [autoSlug, setAutoSlug] = React.useState(true);
 
-  const [type, setType] = React.useState("");
-  const [status, setStatus] = React.useState("");
+  // ✅ tip dosyasına uyumlu
+  const [type, setType] = React.useState<PropertyType | "">("");
+  const [status, setStatus] = React.useState<PropertyStatus | "">("");
 
   const [address, setAddress] = React.useState("");
   const [city, setCity] = React.useState("");
@@ -147,8 +156,9 @@ export function usePropertyForm(existing?: AdminProperty | null, isNew?: boolean
       setTitle(existing.title ?? "");
       setSlug(existing.slug ?? "");
 
-      setType(existing.type ?? "");
-      setStatus(existing.status ?? "");
+      // ✅ type/status: string => enum union
+      setType((existing.type ?? "") as PropertyType | "");
+      setStatus((existing.status ?? "") as PropertyStatus | "");
 
       setAddress(existing.address ?? "");
       setCity(existing.city ?? "");
@@ -201,7 +211,7 @@ export function usePropertyForm(existing?: AdminProperty | null, isNew?: boolean
 
   const validateRequired = (): string | null => {
     if (!title.trim() || !slug.trim()) return "Başlık ve slug zorunlu";
-    if (!type.trim() || !status.trim()) return "Tip ve durum zorunlu";
+    if (!String(type).trim() || !String(status).trim()) return "Tip ve durum zorunlu";
     if (!address.trim() || !city.trim() || !district.trim()) return "Adres/Şehir/İlçe zorunlu";
     return null;
   };
@@ -210,8 +220,8 @@ export function usePropertyForm(existing?: AdminProperty | null, isNew?: boolean
     const body: PropertyUpsertBody = {
       title: title.trim(),
       slug: slug.trim(),
-      type: type.trim(),
-      status: status.trim(),
+      type: String(type).trim(),
+      status: String(status).trim(),
       address: address.trim(),
       district: district.trim(),
       city: city.trim(),

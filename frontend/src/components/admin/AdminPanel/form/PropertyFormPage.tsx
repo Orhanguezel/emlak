@@ -17,13 +17,18 @@ import {
   useUpdatePropertyAdminMutation,
 } from "@/integrations/rtk/endpoints/admin/properties_admin.endpoints";
 
-// ✅ meta endpoints (public)
 import {
   useListPropertyTypesQuery,
   useListPropertyStatusesQuery,
 } from "@/integrations/rtk/endpoints/properties.endpoints";
 
-import { extractUploadResult } from "@/components/admin/AdminPanel/form/properties/helpers";
+import type { PropertyType, PropertyStatus } from "@/integrations/rtk/types/properties";
+
+import {
+  extractUploadResult,
+  extractUploadResults, // ✅ çoklu parse
+} from "@/components/admin/AdminPanel/form/properties/helpers";
+
 import { usePropertyForm } from "@/components/admin/AdminPanel/form/properties/usePropertyForm";
 
 import { PropertyBasicSection } from "./properties/PropertyBasicSection";
@@ -44,6 +49,11 @@ type UploadedLike = {
 const uniq = (arr: string[]): string[] =>
   Array.from(new Set(arr.map((x) => x.trim()).filter(Boolean)));
 
+const safeFileStem = (name: string) => name.replace(/\.[^.]+$/, "");
+
+const makeKeyPart = (): string =>
+  globalThis.crypto?.randomUUID?.() ?? `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+
 export default function PropertyFormPage() {
   const nav = useNavigate();
   const { id } = useParams() as { id?: string };
@@ -54,7 +64,6 @@ export default function PropertyFormPage() {
     { skip: isNew },
   );
 
-  // ✅ meta options
   const { data: typeOptionsRaw = [] } = useListPropertyTypesQuery();
   const { data: statusOptionsRaw = [] } = useListPropertyStatusesQuery();
 
@@ -130,7 +139,7 @@ export default function PropertyFormPage() {
       const { id: assetId, url } = extractUploadResult(res as any);
 
       const fallbackAlt =
-        form.alt.trim() || form.title.trim() || file.name.replace(/\.[^.]+$/, "");
+        form.alt.trim() || form.title.trim() || safeFileStem(file.name);
 
       const nextAssets = form.upsertCoverFromUpload(assetId, url, fallbackAlt);
 
@@ -191,6 +200,12 @@ export default function PropertyFormPage() {
     }
   };
 
+  /**
+   * ✅ GALERİ UPLOAD FIX
+   * - Dosyaları tek tek yükle (storage key çakışmasını bitirir)
+   * - Her dosyada unique path kullan
+   * - Response'tan çoklu item çıkar (extractUploadResults)
+   */
   const uploadGalleryFiles = async (files: FileList): Promise<void> => {
     if (isNew || !id) {
       toast.error("Önce kaydı oluşturun, sonra galeri ekleyin.");
@@ -201,33 +216,36 @@ export default function PropertyFormPage() {
     if (!list.length) return;
 
     try {
-      const res = await uploadToBucket({
-        bucket: "properties",
-        files: list,
-        path: `properties/${id}/gallery/`,
-        upsert: true,
-      }).unwrap();
+      const collected: UploadedLike[] = [];
 
-      const anyRes = res as any;
-      const rawItems = anyRes?.items ?? anyRes?.data?.items ?? anyRes?.result?.items ?? [];
-      const normalized = (Array.isArray(rawItems) ? rawItems : [rawItems]).flat().filter(Boolean);
+      for (const file of list) {
+        const uniqueName = `${makeKeyPart()}_${file.name}`;
+        const res = await uploadToBucket({
+          bucket: "properties",
+          files: [file],
+          path: `properties/${id}/gallery/${uniqueName}`, // ✅ benzersiz
+          upsert: false, // ✅ overwrite olmasın
+        }).unwrap();
 
-      const mapped: UploadedLike[] = normalized.map((it: any) => {
-        const asset_id = (it?.id ?? it?.asset_id ?? it?.assetId ?? null) as string | null;
-        const url =
-          (it?.url ?? it?.public_url ?? it?.publicUrl ?? it?.cdn_url ?? null) as string | null;
+        const extracted = extractUploadResults(res as any);
 
-        const fileNameRaw = it?.name ?? it?.filename;
-        const fileName =
-          typeof fileNameRaw === "string" && fileNameRaw.trim() ? fileNameRaw : undefined;
+        // Bazı backend'ler tek item döner; extractUploadResults onu da kapsar
+        for (const ex of extracted) {
+          collected.push({
+            asset_id: ex.id,
+            url: ex.url,
+            fileName: safeFileStem(file.name),
+            mime: file.type || null,
+          });
+        }
+      }
 
-        const mime = (it?.mime ?? null) as string | null;
+      if (!collected.length) {
+        toast.error("Yükleme tamamlandı ama storage response boş döndü (items yok).");
+        return;
+      }
 
-        const base: UploadedLike = { asset_id, url, mime };
-        return fileName ? { ...base, fileName } : base;
-      });
-
-      const nextAssets = form.addUploadedAssets(mapped);
+      const nextAssets = form.addUploadedAssets(collected);
 
       await updateOne({ id: String(id), patch: { assets: nextAssets as any } }).unwrap();
       toast.success("Galeri güncellendi");
@@ -299,10 +317,10 @@ export default function PropertyFormPage() {
         setSlug={form.setSlug}
         autoSlug={form.autoSlug}
         setAutoSlug={form.setAutoSlug}
-        type={form.type}
-        setType={form.setType}
-        status={form.status}
-        setStatus={form.setStatus}
+        type={form.type as PropertyType | ""}          // ✅ tip uyumu
+        setType={form.setType as (v: PropertyType | "") => void}
+        status={form.status as PropertyStatus | ""}    // ✅ tip uyumu
+        setStatus={form.setStatus as (v: PropertyStatus | "") => void}
         typeOptions={typeOptions}
         statusOptions={statusOptions}
         address={form.address}
@@ -363,17 +381,9 @@ export default function PropertyFormPage() {
         setHasElevator={form.setHasElevator}
       />
 
-      <PropertyMapSection
-        lat={form.lat}
-        setLat={form.setLat}
-        lng={form.lng}
-        setLng={form.setLng}
-      />
+      <PropertyMapSection lat={form.lat} setLat={form.setLat} lng={form.lng} setLng={form.setLng} />
 
-      <PropertyDescriptionSection
-        description={form.description}
-        setDescription={form.setDescription}
-      />
+      <PropertyDescriptionSection description={form.description} setDescription={form.setDescription} />
 
       {!isNew ? (
         <PropertyGallerySection

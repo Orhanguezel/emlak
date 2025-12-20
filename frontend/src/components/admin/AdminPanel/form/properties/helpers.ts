@@ -37,6 +37,10 @@ export const toIntOrNull = (v: string): number | null => {
 
 export type UploadExtract = { id: string | null; url: string | null };
 
+/**
+ * ✅ TEKLİ upload response parse
+ * (Mevcut davranışı BOZMADAN aynen koruyoruz)
+ */
 export const extractUploadResult = (res: any): UploadExtract => {
   const item =
     res?.items?.[0] ??
@@ -69,6 +73,52 @@ export const extractUploadResult = (res: any): UploadExtract => {
   };
 };
 
+/**
+ * ✅ ÇOKLU upload response parse
+ * - res.items / res.data.items / res.result.items / res.payload.items / res (array) destekler
+ * - item başına id/url çıkarır
+ */
+const extractIdUrlFromItem = (item: any): UploadExtract => {
+  const id =
+    item?.id ??
+    item?.asset_id ??
+    item?.assetId ??
+    item?.file_id ??
+    null;
+
+  const url =
+    item?.url ??
+    item?.publicUrl ??
+    item?.public_url ??
+    item?.cdn_url ??
+    null;
+
+  return {
+    id: typeof id === "string" && id.trim() ? id : null,
+    url: typeof url === "string" && url.trim() ? url : null,
+  };
+};
+
+export const extractUploadResults = (res: any): UploadExtract[] => {
+  const items =
+    res?.items ??
+    res?.data?.items ??
+    res?.result?.items ??
+    res?.payload?.items ??
+    (Array.isArray(res) ? res : null) ??
+    null;
+
+  if (Array.isArray(items)) {
+    return items
+      .map(extractIdUrlFromItem)
+      .filter((x) => x.id || x.url);
+  }
+
+  // Fallback: tekli gibi davran
+  const one = extractUploadResult(res);
+  return one.id || one.url ? [one] : [];
+};
+
 /* =========================================================
    ✅ Enum value/label normalizasyon helpers
    - value: DB/API için stabil (yazlik, koy_evi, devren_satilik)
@@ -81,7 +131,6 @@ export type SelectOption = { value: string; label: string };
 export const titleCaseTr = (s: string): string => {
   const t = String(s ?? "").trim();
   if (!t) return "";
-  // kelimeleri ayır, TR locale ile büyük/küçük
   return t
     .split(/\s+/g)
     .filter(Boolean)
@@ -93,9 +142,7 @@ export const titleCaseTr = (s: string): string => {
 };
 
 /**
- * API’den gelen "Yazlık", "yazlik", "YAZLIK" gibi değerleri
- * enum/DB formatına çevirir.
- *
+ * API’den gelen "Yazlık", "yazlik", "YAZLIK" gibi değerleri enum/DB formatına çevirir.
  * - Türkçe karakterleri normalize eder
  * - boşluk/-,/ benzeri ayırıcıları "_" yapar
  */
@@ -103,12 +150,10 @@ export const normalizeEnumValueTr = (input: unknown): string => {
   const raw = String(input ?? "").trim();
   if (!raw) return "";
 
-  // TR -> ascii benzeri normalize (NFD + diacritics)
   const s = raw
     .toLocaleLowerCase("tr-TR")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    // TR özel harfler (NFD sonrası bazıları kalabilir)
     .replace(/ğ/g, "g")
     .replace(/ü/g, "u")
     .replace(/ş/g, "s")
@@ -116,7 +161,6 @@ export const normalizeEnumValueTr = (input: unknown): string => {
     .replace(/ö/g, "o")
     .replace(/ç/g, "c");
 
-  // ayırıcıları "_" yap
   const underscored = s
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/_+/g, "_")
@@ -125,11 +169,6 @@ export const normalizeEnumValueTr = (input: unknown): string => {
   return underscored;
 };
 
-/**
- * Enum value -> kullanıcı label (TR)
- * - "_" "-" -> boşluk
- * - bazı özel düzeltmeler (istersen genişlet)
- */
 const LABEL_OVERRIDES: Record<string, string> = {
   yazlik: "Yazlık",
   dubleks: "Dubleks",
@@ -148,17 +187,10 @@ export const labelFromEnumValueTr = (value: unknown): string => {
 
   if (LABEL_OVERRIDES[v]) return LABEL_OVERRIDES[v];
 
-  // genel dönüşüm: "koy_evi" => "Koy Evi" (sonra TR title case)
   const spaced = v.replace(/[_-]+/g, " ");
   return titleCaseTr(spaced);
 };
 
-/**
- * options üret:
- * - fallback enum listesi + api listesi + current değer
- * - hepsini normalize edip uniq yapar
- * - UI label’larını düzgün üretir
- */
 export const buildEnumOptionsTr = (
   current: string,
   api?: string[],
