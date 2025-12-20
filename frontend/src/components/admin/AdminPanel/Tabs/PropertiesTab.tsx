@@ -15,7 +15,6 @@ import {
   useUpdatePropertyAdminMutation,
 } from "@/integrations/rtk/endpoints/admin/properties_admin.endpoints";
 
-
 // ✅ TİPLER TEK KAYNAK: types/properties.ts
 import type {
   AdminListParams,
@@ -145,7 +144,7 @@ export default function PropertiesTab() {
         city: p.city,
         district: p.district,
         neighborhood: (p as any).neighborhood ?? null,
-        price: typeof p.price === "string" ? p.price : p.price ?? null,
+        price: typeof p.price === "string" ? p.price : (p.price as any) ?? null,
         currency: p.currency ?? null,
         image_url: p.image_url ?? null,
         image_effective_url: (p as any).image_effective_url ?? null,
@@ -167,14 +166,49 @@ export default function PropertiesTab() {
   const onAdd = () => navigate("/admin/properties/new");
   const onEdit = (id: string) => navigate(`/admin/properties/${encodeURIComponent(id)}`);
 
+  /**
+   * ✅ Delete: RTK Query bazen 204 No Content dönen DELETE response’larda unwrap() sırasında hata üretir.
+   * Bu yüzden:
+   * - Optimistic UI: satırı anında kaldır
+   * - removeOne çağır (unwrap dene ama parse hatasını "başarılı" kabul et)
+   * - refetch ile doğrula
+   */
   const doDelete = async (p: LocalRow) => {
     if (!confirm(`Silmek istediğinize emin misiniz?\n\n${p.title}`)) return;
+
+    // optimistic UI
+    const prev = rows;
+    setRows((arr) => arr.filter((x) => x.id !== p.id));
+
     try {
+      // 1) unwrap dene (bazı backendlere göre body bekler)
       await removeOne(p.id).unwrap();
+
       toast.success("Emlak silindi");
       await refetch();
+      return;
     } catch (e: any) {
-      toast.error(e?.data?.message || "Silme başarısız");
+      // 2) unwrap parse hatası / empty body gibi durumlarda, silme gerçekten olmuş olabilir.
+      // Refetch ile doğrulayalım.
+      try {
+        const fresh = await refetch().unwrap();
+
+        const list = unwrapList<PropertyAdminView>(fresh as any);
+        const stillExists = list.some((x) => x.id === p.id);
+
+        if (!stillExists) {
+          toast.success("Emlak silindi");
+          return;
+        }
+
+        // hala varsa gerçek hata
+        setRows(prev);
+        toast.error(e?.data?.message || e?.data?.error?.message || "Silme başarısız");
+      } catch {
+        // refetch de patladıysa UI’ı geri al
+        setRows(prev);
+        toast.error(e?.data?.message || e?.data?.error?.message || "Silme başarısız");
+      }
     }
   };
 
@@ -189,7 +223,7 @@ export default function PropertiesTab() {
       toast.success("Durum güncellendi");
     } catch (e: any) {
       setRows((arr) => arr.map((x) => (x.id === p.id ? { ...x, is_active: !v } : x)));
-      toast.error(e?.data?.message || "Durum güncellenemedi");
+      toast.error(e?.data?.message || e?.data?.error?.message || "Durum güncellenemedi");
     }
   };
 
@@ -293,7 +327,7 @@ export default function PropertiesTab() {
                   <td className="px-3 py-2">
                     <Switch
                       checked={!!r.is_active}
-                      onCheckedChange={(v) => toggleActive(r, v)}
+                      onCheckedChange={(v) => toggleActive(r, Boolean(v))}
                       disabled={updating}
                       className="data-[state=checked]:bg-emerald-600"
                     />
@@ -308,6 +342,7 @@ export default function PropertiesTab() {
                       <Button variant="ghost" onClick={() => onEdit(r.id)} title="Düzenle">
                         <Pencil className="h-4 w-4" />
                       </Button>
+
                       <Button
                         variant="ghost"
                         onClick={() => doDelete(r)}
@@ -345,7 +380,9 @@ export default function PropertiesTab() {
       </div>
 
       <div className="flex items-center justify-between gap-2">
-        <div className="text-xs text-gray-500">{isFetching ? "Yükleniyor…" : `Sayfa: ${page + 1}`}</div>
+        <div className="text-xs text-gray-500">
+          {isFetching ? "Yükleniyor…" : `Sayfa: ${page + 1}`}
+        </div>
         <div className="flex gap-2">
           <Button
             type="button"

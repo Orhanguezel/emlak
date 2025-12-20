@@ -37,10 +37,6 @@ export const toIntOrNull = (v: string): number | null => {
 
 export type UploadExtract = { id: string | null; url: string | null };
 
-/**
- * ✅ TEKLİ upload response parse
- * (Mevcut davranışı BOZMADAN aynen koruyoruz)
- */
 export const extractUploadResult = (res: any): UploadExtract => {
   const item =
     res?.items?.[0] ??
@@ -74,55 +70,49 @@ export const extractUploadResult = (res: any): UploadExtract => {
 };
 
 /**
- * ✅ ÇOKLU upload response parse
- * - res.items / res.data.items / res.result.items / res.payload.items / res (array) destekler
- * - item başına id/url çıkarır
+ * ✅ Çoklu upload response parse (items tamamını çıkarır)
  */
-const extractIdUrlFromItem = (item: any): UploadExtract => {
-  const id =
-    item?.id ??
-    item?.asset_id ??
-    item?.assetId ??
-    item?.file_id ??
-    null;
-
-  const url =
-    item?.url ??
-    item?.publicUrl ??
-    item?.public_url ??
-    item?.cdn_url ??
-    null;
-
-  return {
-    id: typeof id === "string" && id.trim() ? id : null,
-    url: typeof url === "string" && url.trim() ? url : null,
-  };
-};
-
 export const extractUploadResults = (res: any): UploadExtract[] => {
-  const items =
+  const raw =
     res?.items ??
     res?.data?.items ??
     res?.result?.items ??
-    res?.payload?.items ??
-    (Array.isArray(res) ? res : null) ??
-    null;
+    res?.data ??
+    res?.result ??
+    res ??
+    [];
 
-  if (Array.isArray(items)) {
-    return items
-      .map(extractIdUrlFromItem)
-      .filter((x) => x.id || x.url);
-  }
+  const arr = Array.isArray(raw) ? raw : [raw];
+  const flat = arr.flat().filter(Boolean);
 
-  // Fallback: tekli gibi davran
-  const one = extractUploadResult(res);
-  return one.id || one.url ? [one] : [];
+  const mapped = flat.map((it: any) => {
+    const id =
+      it?.id ??
+      it?.asset_id ??
+      it?.assetId ??
+      it?.file_id ??
+      null;
+
+    const url =
+      it?.url ??
+      it?.publicUrl ??
+      it?.public_url ??
+      it?.cdn_url ??
+      null;
+
+    return {
+      id: typeof id === "string" && id.trim() ? id : null,
+      url: typeof url === "string" && url.trim() ? url : null,
+    };
+  });
+
+  // uniq by id/url (en azından aynı item tekrarı olmasın)
+  const key = (x: UploadExtract) => `${x.id ?? ""}|${x.url ?? ""}`;
+  return Array.from(new Map(mapped.map((x) => [key(x), x])).values());
 };
 
 /* =========================================================
    ✅ Enum value/label normalizasyon helpers
-   - value: DB/API için stabil (yazlik, koy_evi, devren_satilik)
-   - label: kullanıcı için TR düzgün (Yazlık, Köy Evi, Devren Satılık)
 ========================================================= */
 
 export type SelectOption = { value: string; label: string };
@@ -142,9 +132,8 @@ export const titleCaseTr = (s: string): string => {
 };
 
 /**
- * API’den gelen "Yazlık", "yazlik", "YAZLIK" gibi değerleri enum/DB formatına çevirir.
- * - Türkçe karakterleri normalize eder
- * - boşluk/-,/ benzeri ayırıcıları "_" yapar
+ * Genel enum normalize (snake_case)  ✅
+ * NOT: rooms gibi "2+0" alanlarında kullanılmamalı.
  */
 export const normalizeEnumValueTr = (input: unknown): string => {
   const raw = String(input ?? "").trim();
@@ -169,6 +158,26 @@ export const normalizeEnumValueTr = (input: unknown): string => {
   return underscored;
 };
 
+/**
+ * ✅ ROOMS normalize: backend enum formatı "N+M"
+ * - "2+0" => "2+0"
+ * - "2_0" / "2-0" / "2 0" / "2 x 0" => "2+0"
+ */
+export const normalizeRoomsValueTr = (input: unknown): string => {
+  const raw = String(input ?? "").trim();
+  if (!raw) return "";
+
+  // 2_0 / 2-0 / 2 0 / 2+0 / 2x0 / 2×0 -> 2+0
+  const m = raw.match(/^\s*(\d+)\s*([+x×_\-\s])\s*(\d+)\s*$/i);
+  if (m) return `${m[1]}+${m[3]}`;
+
+  // Son çare: içindeki sayıları yakala (örn "2 + 0 oda")
+  const nums = raw.match(/\d+/g);
+  if (nums && nums.length >= 2) return `${nums[0]}+${nums[1]}`;
+
+  return raw; // fallback
+};
+
 const LABEL_OVERRIDES: Record<string, string> = {
   yazlik: "Yazlık",
   dubleks: "Dubleks",
@@ -184,9 +193,7 @@ const LABEL_OVERRIDES: Record<string, string> = {
 export const labelFromEnumValueTr = (value: unknown): string => {
   const v = normalizeEnumValueTr(value);
   if (!v) return "";
-
   if (LABEL_OVERRIDES[v]) return LABEL_OVERRIDES[v];
-
   const spaced = v.replace(/[_-]+/g, " ");
   return titleCaseTr(spaced);
 };
@@ -214,10 +221,6 @@ export const buildEnumOptionsTr = (
   }));
 };
 
-/**
- * Select için: exactOptionalPropertyTypes uyumlu value spread
- * - value boşsa prop göndermez
- */
 export const selectValueProps = (v: string) => {
   const s = String(v ?? "").trim();
   return s ? ({ value: s } as const) : ({} as const);
