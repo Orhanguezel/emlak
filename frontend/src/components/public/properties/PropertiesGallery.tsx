@@ -21,14 +21,10 @@ import { PropertiesFiltersPanel } from "./PropertiesFiltersPanel";
 import { usePropertiesFilters } from "./usePropertiesFilters";
 import { FeaturedPropertiesSection } from "./FeaturedPropertiesSection";
 
-import {
-  toSelectOptions,
-  unwrapList,
-  toUiProperty,
-  normalizeStatusLabel,
-  normalizeTypeLabel,
-} from "./properties.selectors";
+import { toSelectOptions, unwrapList, toUiProperty } from "./properties.selectors";
+
 import type { Properties as PropertyView } from "@/integrations/rtk/types/properties";
+import { getPropertyStatusLabel, getPropertyTypeLabel } from "@/integrations/rtk/types/properties";
 
 export function PropertiesGallery(props: {
   searchTerm: string;
@@ -162,14 +158,14 @@ export function PropertiesGallery(props: {
                     <div className="absolute top-3 left-3">
                       <span className="inline-flex items-center gap-1 rounded-full bg-slate-900 text-white px-3 py-1 text-xs font-semibold">
                         <BadgeCheck className="w-3.5 h-3.5" />
-                        {normalizeStatusLabel(p.status)}
+                        {getPropertyStatusLabel(p.status)}
                       </span>
                     </div>
 
                     <div className="absolute top-3 right-3">
                       <span className="inline-flex items-center gap-1 rounded-full bg-white/95 text-slate-900 px-3 py-1 text-xs font-semibold border border-gray-200">
                         <HomeIcon className="w-3.5 h-3.5" />
-                        {normalizeTypeLabel(p.type)}
+                        {getPropertyTypeLabel(p.type)}
                       </span>
                     </div>
 
@@ -221,9 +217,7 @@ export function PropertiesGallery(props: {
                     )}
 
                     {p.description && (
-                      <p className="mt-3 text-sm text-gray-600 line-clamp-2">
-                        {p.description}
-                      </p>
+                      <p className="mt-3 text-sm text-gray-600 line-clamp-2">{p.description}</p>
                     )}
                   </div>
                 </div>

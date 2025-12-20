@@ -65,7 +65,11 @@ export function unwrapOne<T = any>(x: unknown): T | null {
 }
 
 export function toSelectOptions(arr: unknown): string[] {
-  return Array.isArray(arr) ? (arr as any[]).map((x) => String(x)).filter(Boolean) : [];
+  return Array.isArray(arr)
+    ? (arr as any[])
+        .map((x) => String(x ?? "").trim())
+        .filter(Boolean)
+    : [];
 }
 
 function safeImage(v: unknown): string {
