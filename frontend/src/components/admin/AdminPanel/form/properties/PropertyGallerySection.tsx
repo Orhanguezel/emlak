@@ -59,15 +59,13 @@ export function PropertyGallerySection({
     >
       <div className="space-y-4">
         <div className="text-sm text-gray-600">
-          {assets.length
-            ? `${assets.length} medya`
-            : "Henüz medya yok. Çoklu görsel yükleyebilirsiniz."}
+          {assets.length ? `${assets.length} medya` : "Henüz medya yok. Çoklu görsel yükleyebilirsiniz."}
         </div>
 
         {assets.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {assets.map((a, idx) => {
-              const key = a.id;
+              const key = String(a.asset_id ?? a.id); // ✅ daha stabil key
               const url = (a.url ?? "").toString();
               const hasStorage = !!a.asset_id;
 
