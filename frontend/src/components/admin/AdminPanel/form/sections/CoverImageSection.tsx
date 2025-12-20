@@ -93,27 +93,6 @@ export function CoverImageSection({
           {/* 🔹 Shadcn pattern: Button asChild + label + sr-only input
               → id yok, ref yok, programatik click yok
               → tüm tarayıcılarda stabil */}
-          <Button
-            type="button"
-            asChild
-            className="bg-rose-600 text-white hover:bg-rose-700"
-          >
-            <label
-              className="inline-flex items-center gap-2 cursor-pointer"
-              onClick={() => {
-                console.log("[CoverImageSection] upload label click");
-              }}
-            >
-              <ImagePlus className="h-4 w-4" />
-              <span>Kapak Yükle</span>
-              <input
-                type="file"
-                accept={accept}
-                onChange={handleFileChange}
-                className="sr-only"
-              />
-            </label>
-          </Button>
 
           {hasAnyStorage && (
             <Button
