@@ -11,6 +11,7 @@ import type { Heating, Rooms } from "@/integrations/rtk/types/properties";
 import {
   labelFromEnumValueTr,
   normalizeEnumValueTr,
+  normalizeRoomsValueTr, // ✅
 } from "@/components/admin/AdminPanel/form/properties/helpers";
 
 type Props = {
@@ -35,7 +36,10 @@ type Props = {
 };
 
 export function PropertyDetailsSection(p: Props) {
-  const roomsValue = React.useMemo(() => normalizeEnumValueTr(p.rooms), [p.rooms]);
+  // ✅ rooms: backend enum "N+M" olduğu için özel normalize
+  const roomsValue = React.useMemo(() => normalizeRoomsValueTr(p.rooms), [p.rooms]);
+
+  // heating için genel normalize OK
   const heatingValue = React.useMemo(() => normalizeEnumValueTr(p.heating), [p.heating]);
 
   return (
@@ -66,17 +70,19 @@ export function PropertyDetailsSection(p: Props) {
           <select
             className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
             value={roomsValue}
-            onChange={(e) => p.setRooms((normalizeEnumValueTr(e.target.value) || "") as Rooms | "")}
+            onChange={(e) => {
+              const v = normalizeRoomsValueTr(e.target.value);
+              p.setRooms((v || "") as Rooms | "");
+            }}
           >
             <option value="">Seçiniz</option>
-            {p.roomsOptions.map((x) => {
-              const v = normalizeEnumValueTr(x);
-              return (
-                <option key={v} value={v}>
-                  {labelFromEnumValueTr(v)}
-                </option>
-              );
-            })}
+
+            {/* ✅ value backend enum ile birebir: "2+0" */}
+            {p.roomsOptions.map((x) => (
+              <option key={x} value={x}>
+                {x /* UI’da 2+0 zaten doğru görünür */}
+              </option>
+            ))}
           </select>
         </div>
 
@@ -119,7 +125,7 @@ export function PropertyDetailsSection(p: Props) {
           >
             <option value="">Seçiniz</option>
             {p.heatingOptions.map((x) => {
-              const v = normalizeEnumValueTr(x);
+              const v = normalizeEnumValueTr(x); // burada sorun yok
               return (
                 <option key={v} value={v}>
                   {labelFromEnumValueTr(v)}
