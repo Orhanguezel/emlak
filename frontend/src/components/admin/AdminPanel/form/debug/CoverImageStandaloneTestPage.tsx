@@ -150,14 +150,6 @@ export default function CoverImageStandaloneTestPage() {
                 console.log("[CoverImageStandaloneTest] upload label click");
               }}
             >
-              <ImagePlus className="h-4 w-4" />
-              <span>Kapak Yükle</span>
-              <input
-                type="file"
-                accept={accept}
-                onChange={handleFileChange}
-                className="sr-only"
-              />
             </label>
 
             {hasAnyStorage && (
